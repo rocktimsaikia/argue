@@ -28,13 +28,40 @@ export function buildTaskPrompt(args: {
 
   sections.push("", "Task prompt:", task.prompt);
 
-  sections.push("", "Task context JSON:", JSON.stringify(task, null, 2));
+  sections.push("", "Task context JSON:", JSON.stringify(buildTaskContext(task, includeJsonSchema)));
 
   if (includeJsonSchema) {
-    sections.push("", "Expected output JSON schema:", JSON.stringify(getTaskOutputJsonSchema(task), null, 2));
+    sections.push("", "Expected output JSON schema:", JSON.stringify(getTaskOutputJsonSchema(task)));
   }
 
   return sections.join("\n");
+}
+
+/**
+ * The task is echoed to the agent as context, but two of its fields are
+ * already spelled out elsewhere in the same prompt: `prompt` is printed
+ * verbatim above, and `metadata.outputSchema` is printed below as the
+ * expected-output block. Sending them twice costs input tokens on every
+ * turn of every round, and providers that resume a session replay the
+ * whole transcript, so each duplicated byte is re-billed in later rounds.
+ */
+function buildTaskContext(task: AgentTaskInput, outputSchemaPrintedSeparately: boolean): Record<string, unknown> {
+  const context: Record<string, unknown> = { ...task };
+  delete context.prompt;
+
+  const metadata = context.metadata;
+  if (outputSchemaPrintedSeparately && metadata && typeof metadata === "object") {
+    const trimmed = { ...(metadata as Record<string, unknown>) };
+    delete trimmed.outputSchema;
+
+    if (Object.keys(trimmed).length > 0) {
+      context.metadata = trimmed;
+    } else {
+      delete context.metadata;
+    }
+  }
+
+  return context;
 }
 
 function buildActionPrompt(task: ActionTaskInput, agent: ResolvedAgentRuntime): string {
@@ -76,7 +103,7 @@ function buildActionPrompt(task: ActionTaskInput, agent: ResolvedAgentRuntime): 
   }
 
   if (task.fullResult) {
-    sections.push("", "Full result JSON:", JSON.stringify(task.fullResult, null, 2));
+    sections.push("", "Full result JSON:", JSON.stringify(task.fullResult));
   }
 
   return sections.join("\n");

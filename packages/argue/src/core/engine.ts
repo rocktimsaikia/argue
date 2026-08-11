@@ -626,10 +626,11 @@ export class ArgueEngine {
         finalClaims: args.finalClaims,
         claimResolutions: args.claimResolutions,
         scoreboard: args.scoreboard,
-        rounds: args.rounds
+        rounds: compactRoundsForReport(args.rounds, args.normalized.reportPolicy.traceLevel)
       },
       metadata: {
         separateSession: true,
+        transcriptTraceLevel: args.normalized.reportPolicy.traceLevel,
         reporterIsActiveParticipant: args.activeParticipants.has(reporterId),
         requestedRepresentativeId: args.normalized.reportPolicy.representativeId,
         constraints: args.normalized.constraints,
@@ -1387,6 +1388,44 @@ function applyTextBudget(
     text: `${text.slice(0, maxChars - 1)}…`,
     truncated: true
   };
+}
+
+/**
+ * How much of an older round's verbatim response survives compaction.
+ * ponytail: one constant, not a config field — raise traceLevel to "full"
+ * if you want the untouched transcript.
+ */
+const COMPACT_REPORT_RESPONSE_CHARS = 1200;
+
+/**
+ * The report composer runs in its own session, so nothing it receives is
+ * amortised against an existing transcript: every byte is sent fresh, and
+ * the round-by-round responses dwarf the rest of the payload. At the
+ * default "compact" trace level, only the newest round keeps its responses
+ * verbatim; older rounds keep every summary, judgement and vote (which is
+ * what the report is actually composed from) with their long-form text
+ * clipped. traceLevel "full" sends everything untouched.
+ */
+function compactRoundsForReport(rounds: RoundRecord[], traceLevel: "compact" | "full"): RoundRecord[] {
+  if (traceLevel === "full" || rounds.length === 0) return rounds;
+
+  const newestRound = rounds.reduce((max, record) => Math.max(max, record.round), 0);
+
+  return rounds.map((record) => {
+    if (record.round === newestRound) return record;
+
+    return {
+      ...record,
+      outputs: record.outputs.map((output) => {
+        const { text, truncated } = applyTextBudget(
+          output.fullResponse,
+          COMPACT_REPORT_RESPONSE_CHARS,
+          "truncate-tail"
+        );
+        return truncated ? { ...output, fullResponse: text } : output;
+      })
+    };
+  });
 }
 
 function collectDisagreements(

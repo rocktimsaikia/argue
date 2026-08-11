@@ -2222,3 +2222,88 @@ describe("graceful interrupt (onInsufficientParticipants)", () => {
     expect(result.rounds.some((r) => r.outputs.some((o) => o.phase === "final_vote"))).toBe(true);
   });
 });
+
+describe("report transcript compaction", () => {
+  const LONG = "x".repeat(5000);
+
+  function longRoundScenarios(): Record<
+    string,
+    { type: "success"; output: AgentTaskResult } | { type: "fail"; error: string }
+  > {
+    const scenarios: Record<string, { type: "success"; output: AgentTaskResult } | { type: "fail"; error: string }> =
+      {};
+    const allClaimIds = PARTICIPANTS.map((p) => `${p}:0:0`);
+
+    for (const participant of PARTICIPANTS) {
+      for (const [phase, round] of [
+        ["initial", 0],
+        ["debate", 1],
+        ["final_vote", 2]
+      ] as const) {
+        scenarios[`round:${phase}:${round}:${participant}`] = {
+          type: "success",
+          output: roundResult({
+            ...mkRoundOutput({ participantId: participant, phase, round, catalogClaimIds: allClaimIds }),
+            fullResponse: LONG
+          })
+        };
+      }
+    }
+
+    scenarios["report:external-reporter"] = { type: "fail", error: "reporter unavailable" };
+    return scenarios;
+  }
+
+  async function dispatchedReportRounds(traceLevel: "compact" | "full") {
+    const delegate = new StubAgentTaskDelegate(longRoundScenarios());
+
+    await new ArgueEngine({ taskDelegate: delegate }).start({
+      requestId: `req-report-trace-${traceLevel}`,
+      task: "Report transcript size",
+      participants: PARTICIPANTS.map((id) => ({ id })),
+      roundPolicy: { minRounds: 1, maxRounds: 1 },
+      reportPolicy: {
+        composer: "representative",
+        representativeId: "external-reporter",
+        traceLevel
+      }
+    });
+
+    const dispatch = delegate.dispatchCalls.find((task) => task.kind === "report");
+    if (dispatch?.kind !== "report") throw new Error("report task was never dispatched");
+    return dispatch;
+  }
+
+  it("clips older rounds but keeps the newest round verbatim at compact trace level", async () => {
+    const dispatch = await dispatchedReportRounds("compact");
+    const rounds = dispatch.reportInput.rounds;
+    const newest = Math.max(...rounds.map((r) => r.round));
+
+    for (const record of rounds) {
+      for (const output of record.outputs) {
+        if (record.round === newest) {
+          expect(output.fullResponse).toBe(LONG);
+        } else {
+          expect(output.fullResponse.length).toBeLessThan(LONG.length);
+          expect(output.fullResponse.endsWith("…")).toBe(true);
+        }
+
+        // Compaction must never cost the reporter a summary or a judgement.
+        expect(output.summary).toBeTruthy();
+        expect(output.judgements.length).toBeGreaterThan(0);
+      }
+    }
+
+    expect(dispatch.metadata?.transcriptTraceLevel).toBe("compact");
+  });
+
+  it("sends every response untouched at full trace level", async () => {
+    const dispatch = await dispatchedReportRounds("full");
+
+    for (const record of dispatch.reportInput.rounds) {
+      for (const output of record.outputs) {
+        expect(output.fullResponse).toBe(LONG);
+      }
+    }
+  });
+});

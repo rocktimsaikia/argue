@@ -135,20 +135,91 @@ function makeMinimalResult(): ArgueResult {
 
 describe("output formatter", () => {
   describe("non-verbose mode", () => {
-    it("does not show detailed judgements or full response", () => {
+    it("says nothing per agent, and settles the round in one line", () => {
       const io = createIO();
       const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
       const handler = fmt.createEventHandler();
 
+      handler({
+        type: "RoundDispatched",
+        at: "2024-01-01T00:00:00.000Z",
+        sessionId: "s1",
+        requestId: "r1",
+        payload: { phase: "debate", round: 1, participants: ["agent-a", "agent-b"] }
+      });
       handler(makeParticipantRespondedEvent());
 
+      // An individual response is tallied, not narrated.
+      expect(io.logs.join("\n")).toBe("");
+
+      handler({
+        type: "RoundCompleted",
+        at: "2024-01-01T00:00:01.000Z",
+        sessionId: "s1",
+        requestId: "r1",
+        payload: { phase: "debate", round: 1, completed: 2, timedOut: 0, failed: 0, newClaims: 3, mergeCount: 0 }
+      });
+
       const all = io.logs.join("\n");
-      expect(all).toContain("agent-a");
-      expect(all).toContain("1✓ 1✗");
-      expect(all).toContain("I agree with the main claim.");
+      expect(all).toContain("debate 1");
+      expect(all).toContain("+3 claims");
+      // Zeros are silence, and per-agent detail belongs to --verbose.
+      expect(all).not.toContain("timeout");
+      expect(all).not.toContain("failed");
       expect(all).not.toContain("full response:");
-      expect(all).not.toContain("judgements:");
       expect(all).not.toContain("Strong evidence");
+    });
+
+    it("still reports an eliminated agent, because that is an exception", () => {
+      const io = createIO();
+      const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
+      const handler = fmt.createEventHandler();
+
+      handler({
+        type: "ParticipantEliminated",
+        at: "2024-01-01T00:00:00.000Z",
+        sessionId: "s1",
+        requestId: "r1",
+        payload: { phase: "debate", round: 1, participantId: "agent-b", reason: "timeout" }
+      });
+
+      const all = io.logs.join("\n");
+      expect(all).toContain("agent-b eliminated");
+      expect(all).toContain("timeout");
+    });
+
+    it("digests surviving claims with their grounding and one artifacts line", () => {
+      const io = createIO();
+      const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
+      const result = makeMinimalResult();
+      const claim = result.finalClaims[0];
+      const resolution = result.claimResolutions[0];
+      if (!claim || !resolution) throw new Error("fixture must carry one claim and one resolution");
+      claim.evidence = [];
+      resolution.evidenceCount = 0;
+
+      fmt.runCompleted(result, { resultPath: "/out/run/r.json", summaryPath: "/out/run/s.md" });
+
+      const all = io.logs.join("\n");
+      expect(all).toContain("c1");
+      expect(all).toContain("2/2 accept");
+      expect(all).toContain("no evidence");
+      // One directory beats two absolute paths.
+      expect(all).toContain("artifacts: /out/run");
+      expect(all).not.toContain("/out/run/r.json");
+    });
+
+    it("strips markdown emphasis the terminal cannot render", () => {
+      const io = createIO();
+      const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
+      const result = makeMinimalResult();
+      result.report.finalSummary = "Consensus reached.\n\n**agent-a**: ships it.";
+
+      fmt.runCompleted(result, { resultPath: "/out/r.json", summaryPath: "/out/s.md" });
+
+      const all = io.logs.join("\n");
+      expect(all).toContain("agent-a: ships it.");
+      expect(all).not.toContain("**");
     });
 
     it("does not show scoreboard in runCompleted", () => {

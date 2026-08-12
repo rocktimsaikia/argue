@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { dirname } from "node:path";
 import pc from "picocolors";
 import type { ArgueEvent, ArgueResult } from "@onevcat/argue";
 import { formatMs } from "./artifacts.js";
@@ -39,13 +41,30 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
   const tag = c.cyan("[argue]");
   const verbose = options.verbose ?? false;
 
+  /**
+   * Per-round tally used by the default output, which prints one line per
+   * round instead of three lines per agent. Everything dropped here is still
+   * in events.jsonl, and `--verbose` still prints all of it.
+   */
+  let roundTally: {
+    label: string;
+    responded: string[];
+    eliminated: string[];
+    newClaims: number;
+    merges: number;
+    timedOut: number;
+    failed: number;
+  } | null = null;
+
   const spinnerStream = options.spinnerStream ?? null;
-  const spinner = spinnerStream
-    ? createSpinner(spinnerStream, "", {
-        isTTY: options.spinnerIsTTY ?? spinnerStream.isTTY ?? false,
-        noColor: options.noColor
-      })
-    : null;
+  const spinnerIsTTY = options.spinnerIsTTY ?? spinnerStream?.isTTY ?? false;
+  // A spinner earns its place only when it can redraw in place. Piped or
+  // logged, the default output's one-line-per-round is the progress report,
+  // and a breadcrumb would just duplicate the line that follows it.
+  const spinner =
+    spinnerStream && (verbose || spinnerIsTTY)
+      ? createSpinner(spinnerStream, "", { isTTY: spinnerIsTTY, noColor: options.noColor })
+      : null;
   let waitingFor: Set<string> = new Set();
 
   function stanceIcon(stance: string): string {
@@ -62,8 +81,36 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
   function indent(text: string, prefix: string): string {
     return text
       .split("\n")
-      .map((line) => `${prefix}${line}`)
+      .map((line) => (line.trim().length === 0 ? "" : `${prefix}${line}`))
       .join("\n");
+  }
+
+  /** Pads before colouring: ANSI escapes would otherwise count as width. */
+  function pad(text: string, width: number): string {
+    return text.length >= width ? text : text + " ".repeat(width - text.length);
+  }
+
+  function beginRound(label: string): void {
+    roundTally = { label, responded: [], eliminated: [], newClaims: 0, merges: 0, timedOut: 0, failed: 0 };
+  }
+
+  /** One settled line per round: who answered, and anything non-zero. */
+  function flushRound(): void {
+    if (!roundTally) return;
+    const tally = roundTally;
+    roundTally = null;
+
+    const ticks = tally.responded.map(() => c.green("✓")).join("") + tally.eliminated.map(() => c.red("✗")).join("");
+
+    const notes = [
+      tally.newClaims > 0 ? `+${tally.newClaims} claims` : null,
+      tally.merges > 0 ? `-${tally.merges} merged` : null,
+      tally.timedOut > 0 ? c.yellow(`${tally.timedOut} timed out`) : null,
+      tally.failed > 0 ? c.red(`${tally.failed} failed`) : null
+    ].filter(Boolean);
+
+    const detail = notes.length > 0 ? notes.join(", ") : c.dim("no change");
+    io.log(`  ${c.bold(pad(tally.label, 9))}${ticks}  ${detail}`);
   }
 
   return {
@@ -76,6 +123,16 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
       composer: string;
       jsonlPath: string;
     }) {
+      if (!verbose) {
+        // The config path was typed by the caller, the requestId is repeated by
+        // the view hint at the end, and the events path lives with the other
+        // artefacts. None of them earn a line here.
+        io.log(`${c.bold("argue")} ${c.dim("·")} ${args.agents.join(", ")} ${c.dim(`· rounds ${args.rounds}`)}`);
+        io.log(c.dim(`  ${singleLine(args.task)}`));
+        io.log("");
+        return;
+      }
+
       io.log(`${tag} ${c.bold("run started")}`);
       io.log(c.dim(`  config: ${args.configPath}`));
       io.log(c.dim(`  requestId: ${args.requestId}`));
@@ -99,8 +156,17 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
 
         if (event.type === "RoundDispatched") {
           const participants = readStringArray(payload.participants);
-          io.log(`${tag} ${c.bold(roundTag)} dispatched ${c.dim("-> " + participants.join(", "))}`);
           waitingFor = new Set(participants);
+
+          if (!verbose) {
+            beginRound(phaseLabel(phase, round));
+            if (waitingFor.size > 0) {
+              spinner?.start(waitLabel(phase, round, waitingFor));
+            }
+            return;
+          }
+
+          io.log(`${tag} ${c.bold(roundTag)} dispatched ${c.dim("-> " + participants.join(", "))}`);
           if (waitingFor.size > 0) {
             spinner?.start(`${roundTag} waiting on ${[...waitingFor].join(", ")}…`);
           }
@@ -122,6 +188,16 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
             .filter(Boolean)
             .join(" ");
           const judgementStr = judgementParts || "0";
+
+          if (!verbose) {
+            roundTally?.responded.push(participantId);
+            waitingFor.delete(participantId);
+            if (waitingFor.size > 0) {
+              spinner?.start(waitLabel(phase, round, waitingFor));
+            }
+            return;
+          }
+
           const stats = c.dim(`(claims+${extractedClaims}, judgements=${judgementStr}, votes=${claimVotes})`);
           io.log(`${tag} ${c.bold(roundTag)} ${c.blue(participantId)} responded ${stats}`);
 
@@ -150,10 +226,17 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
             suffix += ` - ${errorMessage}`;
           }
 
-          io.log(`${tag} ${c.bold(roundTag)} ${c.red(`${participantId} eliminated`)} ${c.dim(suffix)}`);
+          roundTally?.eliminated.push(participantId);
+          io.log(
+            verbose
+              ? `${tag} ${c.bold(roundTag)} ${c.red(`${participantId} eliminated`)} ${c.dim(suffix)}`
+              : `  ${c.red(`${participantId} eliminated`)} ${c.dim(`${phaseLabel(phase, round)} ${suffix}`)}`
+          );
           waitingFor.delete(participantId);
           if (waitingFor.size > 0) {
-            spinner?.start(`${roundTag} waiting on ${[...waitingFor].join(", ")}…`);
+            spinner?.start(
+              verbose ? `${roundTag} waiting on ${[...waitingFor].join(", ")}…` : waitLabel(phase, round, waitingFor)
+            );
           }
           return;
         }
@@ -161,9 +244,13 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
         if (event.type === "ClaimsMerged") {
           const source = readString(payload.sourceClaimId) ?? "?";
           const mergedInto = readString(payload.mergedInto) ?? "?";
-          io.log(`${tag} ${c.bold(roundTag)} ${c.yellow(`claim merged ${source} -> ${mergedInto}`)}`);
+          if (verbose) {
+            io.log(`${tag} ${c.bold(roundTag)} ${c.yellow(`claim merged ${source} -> ${mergedInto}`)}`);
+          }
           if (waitingFor.size > 0) {
-            spinner?.start(`${roundTag} waiting on ${[...waitingFor].join(", ")}…`);
+            spinner?.start(
+              verbose ? `${roundTag} waiting on ${[...waitingFor].join(", ")}…` : waitLabel(phase, round, waitingFor)
+            );
           }
           return;
         }
@@ -175,6 +262,19 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
           const claimCatalogSize = readNumber(payload.claimCatalogSize) ?? 0;
           const newClaims = readNumber(payload.newClaims) ?? 0;
           const mergeCount = readNumber(payload.mergeCount) ?? 0;
+
+          if (!verbose) {
+            if (roundTally) {
+              roundTally.newClaims = newClaims;
+              roundTally.merges = mergeCount;
+              roundTally.timedOut = timedOut;
+              roundTally.failed = failed;
+            }
+            flushRound();
+            waitingFor.clear();
+            return;
+          }
+
           io.log(
             c.dim(
               `${tag} ${roundTag} completed: done=${completed} timeout=${timedOut} failed=${failed} claims=${claimCatalogSize} (+${newClaims}, -${mergeCount})`
@@ -185,19 +285,21 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
         }
 
         if (event.type === "GlobalDeadlineHit") {
-          io.log(`${tag} ${c.red("global deadline hit")}`);
+          io.log(verbose ? `${tag} ${c.red("global deadline hit")}` : `  ${c.red("global deadline hit")}`);
           return;
         }
 
         if (event.type === "EarlyStopTriggered") {
-          io.log(`${tag} ${c.yellow(`early stop triggered at ${roundTag}`)}`);
+          io.log(verbose ? `${tag} ${c.yellow(`early stop triggered at ${roundTag}`)}` : c.dim("  early stop"));
           return;
         }
 
         if (event.type === "ReportDispatched") {
           const reporterId = readString(payload.reporterId) ?? "unknown";
-          io.log(`${tag} ${c.magenta(`report dispatched -> ${reporterId}`)}`);
-          spinner?.start(`composing report via ${reporterId}…`);
+          if (verbose) {
+            io.log(`${tag} ${c.magenta(`report dispatched -> ${reporterId}`)}`);
+          }
+          spinner?.start(verbose ? `composing report via ${reporterId}…` : "report…");
           return;
         }
 
@@ -235,7 +337,12 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
           const mode = readString(payload.mode) ?? "unknown";
           const reason = readString(payload.reason);
           const suffix = reason ? c.dim(` (fallback: ${reason})`) : "";
-          io.log(`${tag} ${c.magenta(`report completed: ${mode}`)}${suffix}`);
+          if (verbose) {
+            io.log(`${tag} ${c.magenta(`report completed: ${mode}`)}${suffix}`);
+          } else if (reason) {
+            // A silent fallback to the builtin composer changes what you read.
+            io.log(`  ${c.yellow(`report fell back to ${mode}`)} ${c.dim(`(${reason})`)}`);
+          }
         }
       };
     },
@@ -246,12 +353,30 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
 
     runCompleted(result: ArgueResult, paths: { resultPath: string; summaryPath: string }) {
       spinner?.stop();
+
+      const statusTone = resultStatusTone(result.status);
+      const statusColor = statusTone === "success" ? c.green : statusTone === "warning" ? c.yellow : c.red;
+
+      if (!verbose) {
+        io.log("");
+        io.log(
+          `${statusColor(c.bold(result.status))} ${c.dim("·")} ${result.representative.participantId} ${c.dim(`(${formatNumber(result.representative.score)})`)}`
+        );
+
+        if (result.report.finalSummary) {
+          io.log("");
+          io.log(indent(plainText(result.report.finalSummary), "  "));
+        }
+
+        printClaimDigest(result);
+        printArtifacts(paths);
+        return;
+      }
+
       io.log("");
       io.log(c.dim("─".repeat(60)));
       io.log("");
 
-      const statusTone = resultStatusTone(result.status);
-      const statusColor = statusTone === "success" ? c.green : statusTone === "warning" ? c.yellow : c.red;
       io.log(`${tag} ${c.bold("result:")} ${statusColor(result.status)}`);
       io.log(
         `  representative: ${c.bold(result.representative.participantId)} ${c.dim(`(score: ${formatNumber(result.representative.score)})`)}`
@@ -263,9 +388,7 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
         io.log(`  ${result.report.finalSummary}`);
       }
 
-      if (verbose) {
-        printVerboseResult(result);
-      }
+      printVerboseResult(result);
 
       io.log("");
       io.log(c.dim(`  result: ${paths.resultPath}`));
@@ -275,12 +398,62 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
     runFailed(error: unknown, errorPath: string) {
       spinner?.stop();
       io.log("");
-      io.log(c.dim("─".repeat(60)));
-      io.log("");
+      if (verbose) {
+        io.log(c.dim("─".repeat(60)));
+        io.log("");
+      }
       io.error(`${tag} ${c.red(c.bold("run failed"))}: ${String(error)}`);
-      io.log(c.dim(`  error: ${errorPath}`));
+      io.log(c.dim(`  error: ${contractPath(errorPath)}`));
     }
   };
+
+  /**
+   * The surviving claims, one line each, with what backs them. Merged and
+   * withdrawn claims are omitted: they are bookkeeping, not conclusions.
+   */
+  function printClaimDigest(result: ArgueResult): void {
+    const active = result.finalClaims.filter((claim) => claim.status === "active");
+    if (active.length === 0) return;
+
+    const idWidth = Math.max(...active.map((claim) => claim.claimId.length));
+    const titles = new Map(active.map((claim) => [claim.claimId, truncate(claim.title, 44)]));
+    const titleWidth = Math.max(...[...titles.values()].map((title) => title.length));
+    io.log("");
+
+    for (const claim of active) {
+      const resolution = result.claimResolutions.find((r) => r.claimId === claim.claimId);
+      const verdict = resolution
+        ? (resolution.status === "resolved" ? c.green : c.red)(
+            `${resolution.acceptCount}/${resolution.totalVoters} ${resolution.status === "resolved" ? "accept" : "unresolved"}`
+          )
+        : c.dim("no vote");
+
+      const sources =
+        claim.evidence.length > 0
+          ? c.dim(`${claim.evidence.length} source${claim.evidence.length === 1 ? "" : "s"}`)
+          : c.yellow("no evidence");
+
+      const title = titles.get(claim.claimId) ?? claim.title;
+      io.log(`  ${c.dim(pad(claim.claimId, idWidth))}  ${pad(title, titleWidth)}  ${verdict}  ${sources}`);
+    }
+  }
+
+  /**
+   * Artefacts share one directory unless the caller overrode the paths, so
+   * name the directory once instead of printing two long absolute paths.
+   */
+  function printArtifacts(paths: { resultPath: string; summaryPath: string }): void {
+    io.log("");
+    const resultDir = dirname(paths.resultPath);
+
+    if (resultDir === dirname(paths.summaryPath)) {
+      io.log(c.dim(`  artifacts: ${contractPath(resultDir)}`));
+      return;
+    }
+
+    io.log(c.dim(`  result: ${contractPath(paths.resultPath)}`));
+    io.log(c.dim(`  summary: ${contractPath(paths.summaryPath)}`));
+  }
 
   function printVerboseResponse(payload: Record<string, unknown>): void {
     // Extracted claims
@@ -470,6 +643,41 @@ function readArray(value: unknown): unknown[] {
 function readStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+/** Spinner label for the default output; it redraws, so name the stragglers. */
+function waitLabel(phase: string | undefined, round: number | undefined, waiting: Set<string>): string {
+  return `${phaseLabel(phase, round)} waiting on ${[...waiting].join(", ")}…`;
+}
+
+/** Human phase name for the default output: "initial", "debate 2", "vote". */
+function phaseLabel(phase: string | undefined, round: number | undefined): string {
+  if (phase === "initial") return "initial";
+  if (phase === "final_vote") return "vote";
+  if (phase === "debate") return round === undefined ? "debate" : `debate ${round}`;
+  return formatRoundTag(phase, round);
+}
+
+/** Home directory collapsed to `~`, so a path fits on one line. */
+function contractPath(path: string): string {
+  const home = homedir();
+  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+}
+
+/**
+ * Terminals do not render markdown, so emphasis markers that reach them are
+ * just noise. The engine's builtin summary is markdown by design.
+ */
+function plainText(value: string): string {
+  return value
+    .replace(/\*\*(.+?)\*\*/gs, "$1")
+    .replace(/__(.+?)__/gs, "$1")
+    .replace(/^#{1,6}\s+/gm, "");
+}
+
+function truncate(value: string, maxChars: number): string {
+  const flat = singleLine(value);
+  return flat.length <= maxChars ? flat : `${flat.slice(0, maxChars - 1)}…`;
 }
 
 function formatRoundTag(phase: string | undefined, round: number | undefined): string {

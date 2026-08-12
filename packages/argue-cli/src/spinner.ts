@@ -27,6 +27,7 @@ export function createSpinner(stream: SpinnerStream, label: string, options: Spi
   let frame = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
   let active = false;
+  let lastBreadcrumb: string | null = null;
 
   const dim = useColor ? "\x1b[2m" : "";
   const cyan = useColor ? "\x1b[36m" : "";
@@ -45,8 +46,13 @@ export function createSpinner(stream: SpinnerStream, label: string, options: Spi
       active = true;
       if (!isTTY) {
         // No animation in non-TTY contexts (logs, CI). Still emit one line so
-        // there is a visible breadcrumb that the command is running.
-        stream.write(`${currentLabel}\n`);
+        // there is a visible breadcrumb that the command is running — but only
+        // when the label actually changed. Without this guard, every stop/start
+        // cycle (one per engine event) stacks another identical line in the log.
+        if (currentLabel !== lastBreadcrumb) {
+          stream.write(`${currentLabel}\n`);
+          lastBreadcrumb = currentLabel;
+        }
         return;
       }
       stream.write("\x1b[?25l");

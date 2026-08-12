@@ -526,7 +526,10 @@ describe("cli config loader", () => {
         "--agents",
         "a2,a3",
         "--composer",
-        "builtin"
+        "builtin",
+        // Verbose so the echoed plan still names every resolved value this
+        // precedence test asserts on; the default output omits config echo.
+        "--verbose"
       ],
       {
         log: (msg: string) => logs.push(msg),
@@ -559,7 +562,8 @@ describe("cli config loader", () => {
     expect(result.ok).toBe(true);
     expect(result.code).toBe(0);
     expect(errors).toHaveLength(0);
-    expect(logs.some((x) => x.includes("run started"))).toBe(true);
+    // The default banner names the agents and round range, not "run started".
+    expect(logs.some((x) => x.startsWith("argue ·"))).toBe(true);
   });
 
   it("bare command prints help", async () => {

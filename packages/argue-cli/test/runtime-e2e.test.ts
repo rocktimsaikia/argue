@@ -71,7 +71,7 @@ describe("argue-cli runtime e2e", () => {
 
     expect(result.ok).toBe(true);
     expect(errors).toHaveLength(0);
-    expect(logs.some((line) => line.includes("result:"))).toBe(true);
+    expect(logs.some((line) => line.includes("consensus"))).toBe(true);
 
     const resultJson = JSON.parse(await readFile(join(root, "out", "mock-e2e.result.json"), "utf8"));
     const summary = await readFile(join(root, "out", "mock-e2e.summary.md"), "utf8");

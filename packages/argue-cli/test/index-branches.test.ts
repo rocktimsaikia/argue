@@ -233,7 +233,7 @@ describe("runCli command branches", () => {
     );
 
     expect(result).toEqual({ ok: true, code: 0 });
-    expect(io.logs.some((x) => x.includes("agents: a1, a2"))).toBe(true);
+    expect(io.logs.some((x) => x.startsWith("argue ·") && x.includes("a1, a2"))).toBe(true);
 
     const resultJson = JSON.parse(await readFile(join(root, "out", "trace-run.result.json"), "utf8"));
     expect(resultJson.report.traceIncluded).toBe(true);
@@ -473,8 +473,10 @@ describe("runCli command branches", () => {
     const result = await runCli(["run", "--config", configPath, "--request-id", "progress-run", "--task", "t"], io);
 
     expect(result).toEqual({ ok: true, code: 0 });
-    expect(io.logs.some((x) => x.includes("initial#0") && x.includes("dispatched"))).toBe(true);
-    expect(io.logs.some((x) => x.includes("initial#0") && x.includes("responded") && x.includes("claims+"))).toBe(true);
-    expect(io.logs.some((x) => x.includes("initial#0") && x.includes("completed") && x.includes("claims="))).toBe(true);
+    // The default output reports one settled line per round rather than a
+    // dispatched/responded/completed trio per agent.
+    expect(io.logs.some((x) => x.includes("initial") && x.includes("✓") && x.includes("claims"))).toBe(true);
+    expect(io.logs.some((x) => x.includes("vote") && x.includes("✓"))).toBe(true);
+    expect(io.logs.every((x) => !x.includes("dispatched"))).toBe(true);
   });
 });

@@ -89,6 +89,11 @@ function usesStdinPrompt(cliType: CliProviderConfig["cliType"]): boolean {
     case "generic":
       return true;
     case "copilot":
+      // copilot reads a piped prompt from stdin when -p is absent. It must:
+      // a prompt passed as an argv value is silently dropped past roughly 15k
+      // characters, and copilot then exits 0 with empty stdout. Debate rounds
+      // routinely exceed that, which eliminated the agent for no visible reason.
+      return true;
     case "amp":
       return false;
     case "opencode":
@@ -132,7 +137,13 @@ function buildBaseArgs(
           "-m",
           providerModel,
           ...reasoningArgs,
-          "--full-auto",
+          // codex 0.147 removed `--full-auto`; `--sandbox workspace-write` is
+          // what it meant (write access to the working tree, no prompts) and
+          // has been accepted by `codex exec` for far longer. Deliberately not
+          // --dangerously-bypass-approvals-and-sandbox: that drops sandboxing
+          // altogether, which is not ours to opt an agent into.
+          "--sandbox",
+          "workspace-write",
           "--color",
           "never",
           "--skip-git-repo-check"
@@ -141,7 +152,8 @@ function buildBaseArgs(
       };
     }
     case "copilot":
-      return { args: ["-p", prompt, "--yolo", "--model", providerModel], reasoningApplied: false };
+      // No -p: the prompt arrives on stdin. See usesStdinPrompt above.
+      return { args: ["--yolo", "--model", providerModel], reasoningApplied: false };
     case "gemini":
       return { args: ["--approval-mode", "yolo", "-m", providerModel], reasoningApplied: false };
     case "pi": {

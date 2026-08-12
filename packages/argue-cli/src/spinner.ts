@@ -28,6 +28,7 @@ export function createSpinner(stream: SpinnerStream, label: string, options: Spi
   let timer: ReturnType<typeof setInterval> | null = null;
   let active = false;
   let lastBreadcrumb: string | null = null;
+  let cursorRestoreArmed = false;
 
   const dim = useColor ? "\x1b[2m" : "";
   const cyan = useColor ? "\x1b[36m" : "";
@@ -37,6 +38,37 @@ export function createSpinner(stream: SpinnerStream, label: string, options: Spi
     const glyph = BRAILLE_FRAMES[frame % BRAILLE_FRAMES.length];
     stream.write(`\r${cyan}${glyph}${reset} ${dim}${currentLabel}${reset}\x1b[K`);
     frame += 1;
+  }
+
+  /**
+   * Hiding the cursor is only safe if it is guaranteed to come back. Ctrl-C
+   * never reaches stop(), so without this the caller is left with an invisible
+   * cursor in their shell long after argue has exited.
+   */
+  function armCursorRestore(): void {
+    if (cursorRestoreArmed || !isTTY) return;
+    cursorRestoreArmed = true;
+
+    const restore = (): void => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      active = false;
+      stream.write("\r\x1b[K\x1b[?25h");
+    };
+
+    process.once("exit", restore);
+    // A listener suppresses Node's default exit, so exit explicitly with the
+    // conventional signal codes once the terminal has been put back.
+    process.once("SIGINT", () => {
+      restore();
+      process.exit(130);
+    });
+    process.once("SIGTERM", () => {
+      restore();
+      process.exit(143);
+    });
   }
 
   return {
@@ -55,6 +87,7 @@ export function createSpinner(stream: SpinnerStream, label: string, options: Spi
         }
         return;
       }
+      armCursorRestore();
       stream.write("\x1b[?25l");
       render();
       timer = setInterval(render, intervalMs);

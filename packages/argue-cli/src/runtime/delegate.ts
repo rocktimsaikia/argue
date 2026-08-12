@@ -99,16 +99,21 @@ export async function createTaskDelegate(args: {
         // so the failure can be inspected after the run exits. We do
         // this on a best-effort basis — if the dump itself fails we
         // still propagate the original error to the engine.
+        let dumpNote = "";
         if (error instanceof JsonParseError) {
           try {
             const dumpPath = await persistRawParseError(runDir, entry.task, error);
-            process.stderr.write(`[argue] raw agent output saved to: ${dumpPath}\n`);
+            // Reported through the error rather than written straight to
+            // stderr: a bare write lands in the middle of whatever the
+            // spinner is currently drawing, splicing two lines together.
+            dumpNote = ` (raw output: ${dumpPath})`;
           } catch {
             // Swallow dump failures; the parse error still propagates.
           }
         }
 
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+        const message = error instanceof Error ? error.message : String(error);
+        return { ok: false, error: `${message}${dumpNote}` };
       } finally {
         tasks.delete(taskId);
       }

@@ -128,7 +128,9 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
         // the view hint at the end, and the events path lives with the other
         // artefacts. None of them earn a line here.
         io.log(`${c.bold("argue")} ${c.dim("·")} ${args.agents.join(", ")} ${c.dim(`· rounds ${args.rounds}`)}`);
-        io.log(c.dim(`  ${singleLine(args.task)}`));
+        // One line: the caller just typed this task, and the full text is in
+        // result.json. Re-wrapping a long prompt over six lines helps nobody.
+        io.log(c.dim(`  ${truncate(args.task, 96)}`));
         io.log("");
         return;
       }

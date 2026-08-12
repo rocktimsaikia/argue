@@ -278,18 +278,22 @@ process.stdout.write(JSON.stringify(output));
 
     const execIndex = argv.indexOf("exec");
     const modelFlagIndex = argv.indexOf("-m");
-    const fullAutoIndex = argv.indexOf("--full-auto");
+    const baseSandboxIndex = argv.indexOf("--sandbox");
     const colorIndex = argv.indexOf("--color");
-    const sandboxIndex = argv.indexOf("--sandbox");
+    const overrideSandboxIndex = argv.lastIndexOf("--sandbox");
 
     expect(execIndex).toBeGreaterThan(0);
     expect(modelFlagIndex).toBeGreaterThan(execIndex);
     expect(argv[modelFlagIndex + 1]).toBe("fake");
-    expect(fullAutoIndex).toBeGreaterThan(modelFlagIndex);
-    expect(colorIndex).toBeGreaterThan(fullAutoIndex);
+    // codex dropped --full-auto; workspace-write is the sandbox it implied.
+    expect(baseSandboxIndex).toBeGreaterThan(modelFlagIndex);
+    expect(argv[baseSandboxIndex + 1]).toBe("workspace-write");
+    expect(argv).not.toContain("--full-auto");
+    expect(colorIndex).toBeGreaterThan(baseSandboxIndex);
     expect(argv[colorIndex + 1]).toBe("never");
-    expect(sandboxIndex).toBeGreaterThan(colorIndex);
-    expect(argv[sandboxIndex + 1]).toBe("danger-full-access");
+    // Custom args land last, so a caller can still widen the sandbox.
+    expect(overrideSandboxIndex).toBeGreaterThan(colorIndex);
+    expect(argv[overrideSandboxIndex + 1]).toBe("danger-full-access");
   });
 
   it("passes reasoning to codex via model_reasoning_effort config override", async () => {
@@ -353,7 +357,7 @@ process.stdout.write(JSON.stringify(output));
     }
   });
 
-  it("builds copilot base args with prompt in args and --yolo", async () => {
+  it("builds copilot base args with the prompt on stdin and --yolo", async () => {
     const script = await createArgvAndStdinEchoScript("argue-cli-runner-copilot-");
 
     const runner = createCliRunner({
@@ -367,16 +371,14 @@ process.stdout.write(JSON.stringify(output));
     const result = await runner.runTask({ task: makeRoundTask(), agent });
     const { argv, stdin } = getArgvAndStdin(result as { kind: string; output: { fullResponse: string } });
 
-    expect(argv).toContain("-p");
-    const pIdx = argv.indexOf("-p");
-    const promptValue = argv[pIdx + 1]!;
-    expect(promptValue).toContain("argue CLI host");
+    // copilot only reads stdin when -p is absent, and an argv prompt is
+    // silently dropped past ~15k characters, which every debate round exceeds.
+    expect(argv).not.toContain("-p");
+    expect(stdin).toContain("argue CLI host");
 
     expect(argv).toContain("--yolo");
     expect(argv).toContain("--model");
     expect(argv[argv.indexOf("--model") + 1]).toBe("fake");
-
-    expect(stdin).toBe("");
   });
 
   it("builds gemini base args with stdin prompt and --approval-mode yolo", async () => {

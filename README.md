@@ -202,10 +202,29 @@ const result = await engine.start({
 });
 
 // result.status → "consensus" | "partial_consensus" | "unresolved" | "interrupted" | "failed"
-// result.claimResolutions → per-claim vote outcomes
+// result.claimResolutions → per-claim vote outcomes (incl. evidenceCount)
+// result.finalClaims[].evidence → sources cited for each claim
 // result.representative → highest-scoring agent
 // result.action → action output (if actionPolicy was set)
 ```
+
+### Evidence
+
+Every claim carries an `evidence` array: sources a reader can check for themselves, such as
+`src/app.ts:120`, a URL, a command plus its output, or a quoted passage from the task input.
+Agents are told plainly that reasoning is not evidence and that an empty array beats an
+invented citation.
+
+Evidence is gathered inside the normal rounds, so it costs no extra model turns. A source
+cited while agreeing with a peer's claim corroborates it; a source cited while disagreeing
+counts against it. Scoring then discounts each agent's peer-review correctness by how much of
+its own output it actually grounded, so the agent that can point at something outranks the
+agent that merely sounded convincing — and it is the top scorer that writes the final report.
+
+Votes still decide whether a claim is `resolved`. What changes is that a claim voted through
+with nothing behind it is now visible instead of invisible: `evidenceCount` lands in
+`result.json`, the CLI tags it `(no evidence)`, and the viewer says `no evidence cited`.
+See [docs/adr/0003-claim-grounding.md](docs/adr/0003-claim-grounding.md).
 
 ### Integration Example: Claude Code Hook
 

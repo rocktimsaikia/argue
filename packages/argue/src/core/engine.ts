@@ -893,7 +893,14 @@ export class ArgueEngine {
       "Return ONE valid JSON object only. Do not wrap with markdown/code fences.",
       `phase=${phase}`,
       `round=${round}`,
-      `task=${input.task}`
+      `task=${input.task}`,
+      "",
+      "Evidence rules (these decide your score):",
+      "- Every claim carries an evidence array: sources a reader can check for themselves.",
+      "- Good evidence: 'src/app.ts:120', a URL you actually read, a command plus its real output, a quoted passage from the task input.",
+      "- Reasoning, restated conclusions and plausible-sounding references are NOT evidence.",
+      "- Nothing checkable to point at? Use []. An empty array is honest and expected; an invented or vague citation is the worst possible answer.",
+      "- Judging a peer's claim, cite evidence too — especially to disagree. Sources you cite while agreeing corroborate that claim; sources you cite while disagreeing count against it."
     ];
 
     if (input.constraints?.language) {
@@ -916,12 +923,12 @@ export class ArgueEngine {
         "- fullResponse: string",
         "- summary: string",
         "- taskTitle: concise one-sentence headline of the debate task. Aim for ~30 characters in CJK scripts (Chinese/Japanese/Korean) or ~60 characters in Latin scripts; hard cap 60. Single line, no markdown, no surrounding quotes.",
-        "- extractedClaims: array of { title, statement, category? } — do NOT include claimId; the engine assigns IDs",
-        "- judgements: array of { claimId, stance, confidence, rationale, revisedStatement?, mergesWith? }",
+        "- extractedClaims: array of { title, statement, category?, evidence } — do NOT include claimId; the engine assigns IDs",
+        "- judgements: array of { claimId, stance, confidence, rationale, evidence?, revisedStatement?, mergesWith? }",
         "- claimVotes MUST NOT appear in initial phase",
         "",
         "Initial phase JSON template:",
-        '{"fullResponse":"...","summary":"...","taskTitle":"...","extractedClaims":[{"title":"...","statement":"...","category":"pro"}],"judgements":[]}'
+        '{"fullResponse":"...","summary":"...","taskTitle":"...","extractedClaims":[{"title":"...","statement":"...","category":"pro","evidence":["src/file.ts:42"]}],"judgements":[]}'
       ].join("\n");
     }
 
@@ -938,12 +945,12 @@ export class ArgueEngine {
         "Schema requirements (debate):",
         "- fullResponse: string",
         "- summary: string",
-        "- judgements: NON-EMPTY array of { claimId, stance, confidence, rationale, revisedStatement?, mergesWith? }",
-        "- extractedClaims: optional array of new claims { title, statement, category? } — do NOT include claimId",
+        "- judgements: NON-EMPTY array of { claimId, stance, confidence, rationale, evidence?, revisedStatement?, mergesWith? }",
+        "- extractedClaims: optional array of new claims { title, statement, category?, evidence } — do NOT include claimId",
         "- claimVotes MUST NOT appear in debate phase",
         "",
         "Debate phase JSON template:",
-        '{"fullResponse":"...","summary":"...","judgements":[{"claimId":"c1","stance":"revise","confidence":0.82,"rationale":"...","revisedStatement":"...","mergesWith":"c0"}],"extractedClaims":[]}'
+        '{"fullResponse":"...","summary":"...","judgements":[{"claimId":"c1","stance":"revise","confidence":0.82,"rationale":"...","evidence":["https://example.com/spec#section-3"],"revisedStatement":"...","mergesWith":"c0"}],"extractedClaims":[]}'
       ].join("\n");
     }
 
@@ -954,6 +961,7 @@ export class ArgueEngine {
       "- Vote each active claim independently.",
       "- claimCatalog contains active claims only; do not re-open or re-merge historical merged claims from prior context.",
       "- Every active claim should appear exactly once in claimVotes.",
+      "- Weigh each claim's evidence array. A claim nobody can back with anything checkable is a shared opinion, not a finding — reject it unless it is self-evidently true from the task input.",
       "",
       "Schema requirements (final_vote):",
       "- fullResponse: string",
@@ -1157,6 +1165,7 @@ function updateClaims(
         title: extracted.title,
         statement: extracted.statement,
         category: extracted.category,
+        evidence: dedupeEvidence(extracted.evidence),
         proposedBy: [output.participantId],
         status: "active"
       });
@@ -1173,6 +1182,7 @@ function updateClaims(
         title: `Seed from ${output.participantId}`,
         statement: output.summary,
         category: "todo",
+        evidence: [],
         proposedBy: [output.participantId],
         status: "active"
       });
@@ -1223,6 +1233,17 @@ function updateClaims(
         }
       }
 
+      // A peer who backs a claim with a source is corroborating it, so that
+      // source becomes part of the claim's grounding. Sources cited while
+      // DISAGREEING argue against the claim and must never count towards it;
+      // they stay in the round record and in result.disagreements.
+      if (judgement.stance !== "disagree" && judgement.evidence.length > 0) {
+        const corroborated = directClaim ?? claimMap.get(targetId);
+        if (corroborated) {
+          corroborated.evidence = dedupeEvidence([...corroborated.evidence, ...judgement.evidence]);
+        }
+      }
+
       if (!judgement.mergesWith) continue;
 
       const mergeIntoId = resolveClaimId(claimMap, judgement.mergesWith);
@@ -1247,6 +1268,8 @@ function updateClaims(
       loser.status = "merged";
       loser.mergedInto = survivorId;
       survivor.proposedBy = [...new Set([...survivor.proposedBy, ...loser.proposedBy])];
+      // Deduplication must not quietly discard the merged claim's sources.
+      survivor.evidence = dedupeEvidence([...survivor.evidence, ...loser.evidence]);
 
       for (const [id, entry] of claimMap.entries()) {
         if (entry.status === "merged" && entry.mergedInto === loserId) {
@@ -1276,6 +1299,23 @@ function updateClaims(
     newClaimCount,
     mergeEvents
   };
+}
+
+/** Same source cited by two agents (or twice by one) is one source, not two. */
+function dedupeEvidence(entries: string[] | undefined): string[] {
+  if (!entries || entries.length === 0) return [];
+
+  const seen = new Map<string, string>();
+  for (const entry of entries) {
+    const trimmed = entry.trim();
+    if (trimmed.length === 0) continue;
+    const key = trimmed.toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, trimmed);
+    }
+  }
+
+  return [...seen.values()];
 }
 
 function resolveClaimId(claimMap: Map<string, Claim>, claimId: string): string {
@@ -1338,6 +1378,7 @@ function buildClaimResolutions(args: {
       acceptCount,
       rejectCount,
       totalVoters,
+      evidenceCount: claim.evidence.length,
       votes
     };
   });

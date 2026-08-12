@@ -16,6 +16,8 @@ const ClaimDraftSchema = ClaimSchema.pick({
   title: true,
   statement: true,
   category: true,
+  // Peers must see what a claim is (or isn't) backed by to judge it honestly.
+  evidence: true,
   proposedBy: true,
   status: true,
   mergedInto: true
@@ -24,7 +26,8 @@ const ClaimDraftSchema = ClaimSchema.pick({
 const ExtractedClaimOutputSchema = ClaimSchema.pick({
   title: true,
   statement: true,
-  category: true
+  category: true,
+  evidence: true
 }).extend({
   claimId: z.string().min(1).optional()
 });
@@ -66,14 +69,22 @@ export const ROUND_OUTPUT_CONTENT_SCHEMA_REF: Record<z.infer<typeof PhaseSchema>
 
 export const REPORT_OUTPUT_CONTENT_SCHEMA_REF = "argue.report.output-content.v1" as const;
 
+const EVIDENCE_JSON_SCHEMA = {
+  type: "array",
+  items: { type: "string" },
+  description:
+    "Sources a reader can independently check: 'path/to/file.ts:42', a URL, a command plus its output, or a quoted passage from the task input. Reasoning is not evidence. Leave this empty if you have nothing checkable to point at — an empty array is an honest answer, a fabricated or vague citation is not."
+} as const;
+
 const CLAIM_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "statement"],
+  required: ["title", "statement", "evidence"],
   properties: {
     title: { type: "string" },
     statement: { type: "string" },
-    category: { type: "string", enum: ["pro", "con", "risk", "tradeoff", "todo"] }
+    category: { type: "string", enum: ["pro", "con", "risk", "tradeoff", "todo"] },
+    evidence: EVIDENCE_JSON_SCHEMA
   }
 } as const;
 
@@ -86,6 +97,7 @@ const CLAIM_JUDGEMENT_JSON_SCHEMA = {
     stance: { type: "string", enum: ["agree", "disagree", "revise"] },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     rationale: { type: "string" },
+    evidence: EVIDENCE_JSON_SCHEMA,
     revisedStatement: { type: "string" },
     mergesWith: { type: "string" }
   }

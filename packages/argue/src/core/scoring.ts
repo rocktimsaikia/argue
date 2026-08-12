@@ -113,6 +113,54 @@ export function chooseRepresentative(args: {
   };
 }
 
+/**
+ * Floor on the grounding multiplier: a participant whose surviving claims
+ * cite nothing keeps this fraction of the correctness its peers awarded it.
+ *
+ * Peer agreement measures agreement, not truth — three agents can happily
+ * agree on something false, and unanimity is exactly what makes that
+ * invisible. Discounting by grounding means the agent who can point at a
+ * file, a URL or a command output outranks the agent who merely sounded
+ * convincing, and it is the score that picks the representative who writes
+ * the report. The floor is deliberately not 0: peer review is still signal,
+ * and if NO participant cites anything everyone is scaled alike, so the
+ * ranking degrades to today's behaviour instead of turning into noise.
+ */
+const GROUNDING_FLOOR = 0.6;
+
+/**
+ * Fraction of a participant's surviving claims that carry at least one
+ * source. Participants who proposed no surviving claims are neutral rather
+ * than punished — a pure critic never had a claim to ground.
+ */
+function computeGroundingRatios(participants: string[], finalClaims: Claim[]): Map<string, number> {
+  const stats = new Map<string, { grounded: number; total: number }>();
+  for (const participant of participants) {
+    stats.set(participant, { grounded: 0, total: 0 });
+  }
+
+  for (const claim of finalClaims) {
+    if (claim.status !== "active") continue;
+
+    for (const owner of claim.proposedBy) {
+      const item = stats.get(owner);
+      if (!item) continue;
+      item.total += 1;
+      if (claim.evidence.length > 0) {
+        item.grounded += 1;
+      }
+    }
+  }
+
+  const out = new Map<string, number>();
+  for (const participant of participants) {
+    const item = stats.get(participant);
+    out.set(participant, !item || item.total === 0 ? 1 : item.grounded / item.total);
+  }
+
+  return out;
+}
+
 function computePeerReviewCorrectness(
   participants: string[],
   rounds: Array<{ round: number; outputs: ParticipantRoundOutput[] }>,
@@ -151,14 +199,19 @@ function computePeerReviewCorrectness(
     }
   }
 
+  const groundingByParticipant = computeGroundingRatios(participants, finalClaims);
+
   const out = new Map<string, number>();
   for (const participant of participants) {
     const item = stats.get(participant);
+    const grounding = groundingByParticipant.get(participant) ?? 1;
+    const groundingMultiplier = GROUNDING_FLOOR + (1 - GROUNDING_FLOOR) * grounding;
+
     if (!item || item.total === 0) {
-      out.set(participant, 50);
+      out.set(participant, roundTo2(50 * groundingMultiplier));
       continue;
     }
-    out.set(participant, roundTo2((item.agree / item.total) * 100));
+    out.set(participant, roundTo2((item.agree / item.total) * 100 * groundingMultiplier));
   }
 
   return out;

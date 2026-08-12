@@ -4,6 +4,24 @@ import { ReportView } from "../src/components/ReportView.js";
 import { createFixtureResult } from "./fixtures.js";
 
 describe("ReportView", () => {
+  it("shows a claim's cited sources, and says so when a claim has none", () => {
+    const result = createFixtureResult();
+    const [first, second] = result.finalClaims;
+    if (!first || !second) throw new Error("fixture must carry at least two claims");
+    first.evidence = ["src/core/engine.ts:61", "https://example.com/spec"];
+    second.evidence = [];
+
+    const { container } = render(<ReportView result={result} />);
+    const text = container.textContent ?? "";
+
+    expect(container.querySelectorAll(".claim-evidence li")).toHaveLength(2);
+    expect(text).toContain("src/core/engine.ts:61");
+    expect(text).toContain("https://example.com/spec");
+    // An unsourced claim must read as unsourced, not as a blank space.
+    expect(container.querySelectorAll(".claim-evidence-empty").length).toBeGreaterThan(0);
+    expect(text).toContain("no evidence cited");
+  });
+
   it("shows each effective merge only once in the round where it first became true", () => {
     const result = createFixtureResult();
 
@@ -14,7 +32,8 @@ describe("ReportView", () => {
         statement: "survivor",
         category: "pro",
         proposedBy: ["alice", "bob"],
-        status: "active"
+        status: "active",
+        evidence: []
       },
       {
         claimId: "c2",
@@ -23,7 +42,8 @@ describe("ReportView", () => {
         category: "pro",
         proposedBy: ["bob"],
         status: "merged",
-        mergedInto: "c1"
+        mergedInto: "c1",
+        evidence: []
       }
     ];
     result.claimResolutions = [
@@ -33,6 +53,7 @@ describe("ReportView", () => {
         acceptCount: 2,
         rejectCount: 0,
         totalVoters: 2,
+        evidenceCount: 0,
         votes: [
           { participantId: "alice", claimId: "c1", vote: "accept" },
           { participantId: "bob", claimId: "c1", vote: "accept" }
@@ -54,7 +75,8 @@ describe("ReportView", () => {
                 stance: "revise",
                 confidence: 0.9,
                 rationale: "duplicate",
-                mergesWith: "c1"
+                mergesWith: "c1",
+                evidence: []
               }
             ],
             summary: "alice merge proposal"
@@ -70,7 +92,8 @@ describe("ReportView", () => {
                 stance: "revise",
                 confidence: 0.91,
                 rationale: "same duplicate",
-                mergesWith: "c1"
+                mergesWith: "c1",
+                evidence: []
               }
             ],
             summary: "bob confirms merge"
@@ -91,7 +114,8 @@ describe("ReportView", () => {
                 stance: "revise",
                 confidence: 0.92,
                 rationale: "repeated historical merge reference",
-                mergesWith: "c1"
+                mergesWith: "c1",
+                evidence: []
               }
             ],
             summary: "bob repeats the old merge"
@@ -115,7 +139,8 @@ describe("ReportView", () => {
         category: "pro",
         proposedBy: ["alpha"],
         status: "merged",
-        mergedInto: "c2"
+        mergedInto: "c2",
+        evidence: []
       },
       {
         claimId: "c2",
@@ -124,7 +149,8 @@ describe("ReportView", () => {
         category: "pro",
         proposedBy: ["zeta"],
         status: "merged",
-        mergedInto: "c3"
+        mergedInto: "c3",
+        evidence: []
       },
       {
         claimId: "c3",
@@ -132,7 +158,8 @@ describe("ReportView", () => {
         statement: "survivor",
         category: "pro",
         proposedBy: ["gamma"],
-        status: "active"
+        status: "active",
+        evidence: []
       }
     ];
 
@@ -143,6 +170,7 @@ describe("ReportView", () => {
         acceptCount: 3,
         rejectCount: 0,
         totalVoters: 3,
+        evidenceCount: 0,
         votes: [
           { participantId: "alpha", claimId: "c3", vote: "accept" },
           { participantId: "zeta", claimId: "c3", vote: "accept" },
@@ -173,7 +201,8 @@ describe("ReportView", () => {
                 stance: "revise",
                 confidence: 0.9,
                 rationale: "first merge",
-                mergesWith: "c2"
+                mergesWith: "c2",
+                evidence: []
               }
             ],
             summary: "merge c1 to c2"
@@ -201,14 +230,16 @@ describe("ReportView", () => {
                 stance: "revise",
                 confidence: 0.92,
                 rationale: "historical reference",
-                mergesWith: "c2"
+                mergesWith: "c2",
+                evidence: []
               },
               {
                 claimId: "c2",
                 stance: "revise",
                 confidence: 0.93,
                 rationale: "second merge",
-                mergesWith: "c3"
+                mergesWith: "c3",
+                evidence: []
               }
             ],
             summary: "merge c2 to c3"

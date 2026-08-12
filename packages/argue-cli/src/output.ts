@@ -385,12 +385,20 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
         io.log(c.dim(`    ${claim.statement}`));
         io.log(c.dim(`    proposed by: ${claim.proposedBy.join(", ")}`));
 
+        if (claim.evidence.length > 0) {
+          io.log(c.dim(`    evidence: ${claim.evidence.join(" | ")}`));
+        }
+
         // Show resolution for this claim
         const resolution = result.claimResolutions.find((r) => r.claimId === claim.claimId);
         if (resolution) {
           const resColor = resolution.status === "resolved" ? c.green : c.red;
+          // A claim the agents voted through without a single source is the
+          // failure mode this whole tool exists to avoid — name it on the spot.
+          const groundingTag =
+            resolution.status === "resolved" && resolution.evidenceCount === 0 ? c.yellow(" (no evidence)") : "";
           io.log(
-            `    ${resColor(resolution.status)}: ${resolution.acceptCount}/${resolution.totalVoters} accept, ${resolution.rejectCount}/${resolution.totalVoters} reject`
+            `    ${resColor(resolution.status)}${groundingTag}: ${resolution.acceptCount}/${resolution.totalVoters} accept, ${resolution.rejectCount}/${resolution.totalVoters} reject`
           );
         }
       }

@@ -3,11 +3,22 @@ import { z } from "zod";
 export const ClaimCategorySchema = z.enum(["pro", "con", "risk", "tradeoff", "todo"]);
 export const ClaimStatusSchema = z.enum(["active", "merged", "withdrawn"]);
 
+/**
+ * A pointer to something a reader could go and check for themselves:
+ * `path/to/file.ts:42`, a URL, a command and its output, a quoted passage
+ * from the task input. Free-form on purpose — the sources worth citing
+ * differ per debate, and the value is in being checkable, not in parsing
+ * cleanly. Reasoning is NOT evidence; an agent with nothing to point at
+ * is expected to cite nothing.
+ */
+export const EvidenceSchema = z.string().min(1);
+
 export const ClaimSchema = z.object({
   claimId: z.string().min(1),
   title: z.string().min(1),
   statement: z.string().min(1),
   category: ClaimCategorySchema.optional(),
+  evidence: z.array(EvidenceSchema).default([]),
   proposedBy: z.array(z.string().min(1)).min(1),
   status: ClaimStatusSchema.default("active"),
   mergedInto: z.string().min(1).optional()
@@ -23,6 +34,8 @@ export const ClaimJudgementSchema = z.object({
   stance: ClaimStanceSchema,
   confidence: z.number().min(0).max(1),
   rationale: z.string().min(1),
+  /** Sources backing this judgement — the basis for disagreeing, not just asserting. */
+  evidence: z.array(EvidenceSchema).default([]),
   revisedStatement: z.string().min(1).optional(),
   mergesWith: z.string().min(1).optional()
 });
@@ -61,7 +74,8 @@ const ParticipantRoundOutputBaseSchema = z.object({
       ClaimSchema.pick({
         title: true,
         statement: true,
-        category: true
+        category: true,
+        evidence: true
       }).extend({
         claimId: z.string().min(1).optional()
       })
@@ -141,6 +155,12 @@ export const ClaimResolutionSchema = z.object({
   acceptCount: z.number().int().nonnegative(),
   rejectCount: z.number().int().nonnegative(),
   totalVoters: z.number().int().nonnegative(),
+  /**
+   * How many sources the claim carries. Votes decide `status`, so a claim
+   * can be resolved with zero evidence — a consensus of assertions. This
+   * count is what makes that case visible instead of invisible.
+   */
+  evidenceCount: z.number().int().nonnegative().default(0),
   votes: z.array(ClaimVoteSchema)
 });
 

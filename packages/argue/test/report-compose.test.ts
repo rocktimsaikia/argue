@@ -50,7 +50,7 @@ describe("buildBuiltinReport", () => {
             round: 1,
             fullResponse: "r1",
             summary: long,
-            judgements: [{ claimId: "c1", stance: "agree" as const, confidence: 0.9, rationale: "ok" }]
+            judgements: [{ claimId: "c1", stance: "agree" as const, confidence: 0.9, rationale: "ok", evidence: [] }]
           }
         ]
       },
@@ -63,7 +63,9 @@ describe("buildBuiltinReport", () => {
             round: 2,
             fullResponse: "r2",
             summary: long,
-            judgements: [{ claimId: "c1", stance: "disagree" as const, confidence: 0.9, rationale: "change" }]
+            judgements: [
+              { claimId: "c1", stance: "disagree" as const, confidence: 0.9, rationale: "change", evidence: [] }
+            ]
           }
         ]
       }
@@ -99,12 +101,35 @@ describe("buildBuiltinReport", () => {
       ...baseInput,
       status: "consensus",
       finalClaims: [
-        { claimId: "c1", title: "Main point", statement: "s1", proposedBy: ["a1"], status: "active" },
-        { claimId: "c2", title: "Supporting fact", statement: "s2", proposedBy: ["a1", "a2"], status: "active" }
+        { claimId: "c1", title: "Main point", statement: "s1", proposedBy: ["a1"], status: "active", evidence: [] },
+        {
+          claimId: "c2",
+          title: "Supporting fact",
+          statement: "s2",
+          proposedBy: ["a1", "a2"],
+          status: "active",
+          evidence: []
+        }
       ],
       claimResolutions: [
-        { claimId: "c1", status: "resolved", acceptCount: 2, rejectCount: 0, totalVoters: 2, votes: [] },
-        { claimId: "c2", status: "resolved", acceptCount: 2, rejectCount: 0, totalVoters: 2, votes: [] }
+        {
+          claimId: "c1",
+          status: "resolved",
+          acceptCount: 2,
+          rejectCount: 0,
+          totalVoters: 2,
+          evidenceCount: 0,
+          votes: []
+        },
+        {
+          claimId: "c2",
+          status: "resolved",
+          acceptCount: 2,
+          rejectCount: 0,
+          totalVoters: 2,
+          evidenceCount: 0,
+          votes: []
+        }
       ],
       rounds: [
         {
@@ -146,12 +171,28 @@ describe("buildBuiltinReport", () => {
       ...baseInput,
       status: "partial_consensus",
       finalClaims: [
-        { claimId: "c1", title: "Agreed", statement: "s1", proposedBy: ["a1"], status: "active" },
-        { claimId: "c2", title: "Disputed", statement: "s2", proposedBy: ["a2"], status: "active" }
+        { claimId: "c1", title: "Agreed", statement: "s1", proposedBy: ["a1"], status: "active", evidence: [] },
+        { claimId: "c2", title: "Disputed", statement: "s2", proposedBy: ["a2"], status: "active", evidence: [] }
       ],
       claimResolutions: [
-        { claimId: "c1", status: "resolved", acceptCount: 2, rejectCount: 0, totalVoters: 2, votes: [] },
-        { claimId: "c2", status: "unresolved", acceptCount: 1, rejectCount: 1, totalVoters: 2, votes: [] }
+        {
+          claimId: "c1",
+          status: "resolved",
+          acceptCount: 2,
+          rejectCount: 0,
+          totalVoters: 2,
+          evidenceCount: 0,
+          votes: []
+        },
+        {
+          claimId: "c2",
+          status: "unresolved",
+          acceptCount: 1,
+          rejectCount: 1,
+          totalVoters: 2,
+          evidenceCount: 0,
+          votes: []
+        }
       ],
       rounds: []
     });

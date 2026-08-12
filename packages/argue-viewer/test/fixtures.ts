@@ -18,7 +18,8 @@ export function createFixtureResult(): ArgueResult {
         statement: "Strict validation should happen before rendering.",
         category: "pro",
         proposedBy: ["alice"],
-        status: "active"
+        status: "active",
+        evidence: []
       },
       {
         claimId: "c2",
@@ -26,7 +27,8 @@ export function createFixtureResult(): ArgueResult {
         statement: "Use restrained transitions only.",
         category: "risk",
         proposedBy: ["bob"],
-        status: "active"
+        status: "active",
+        evidence: []
       }
     ],
     claimResolutions: [
@@ -36,6 +38,7 @@ export function createFixtureResult(): ArgueResult {
         acceptCount: 2,
         rejectCount: 0,
         totalVoters: 2,
+        evidenceCount: 0,
         votes: [
           { participantId: "alice", claimId: "c1", vote: "accept" },
           { participantId: "bob", claimId: "c1", vote: "accept" }
@@ -47,6 +50,7 @@ export function createFixtureResult(): ArgueResult {
         acceptCount: 1,
         rejectCount: 1,
         totalVoters: 2,
+        evidenceCount: 0,
         votes: [
           { participantId: "alice", claimId: "c2", vote: "accept" },
           { participantId: "bob", claimId: "c2", vote: "reject" }
@@ -133,7 +137,8 @@ export function createFixtureResult(): ArgueResult {
                 claimId: "c1",
                 title: "Prefer strict schema",
                 statement: "Strict validation should happen before rendering.",
-                category: "pro"
+                category: "pro",
+                evidence: []
               }
             ],
             judgements: [
@@ -141,7 +146,8 @@ export function createFixtureResult(): ArgueResult {
                 claimId: "c1",
                 stance: "agree",
                 confidence: 0.84,
-                rationale: "Mandatory for reliability"
+                rationale: "Mandatory for reliability",
+                evidence: []
               }
             ],
             summary: "Start from strict input guarantees"
@@ -157,7 +163,8 @@ export function createFixtureResult(): ArgueResult {
                 claimId: "c2",
                 title: "Avoid over-animation",
                 statement: "Use restrained transitions only.",
-                category: "risk"
+                category: "risk",
+                evidence: []
               }
             ],
             judgements: [
@@ -165,7 +172,8 @@ export function createFixtureResult(): ArgueResult {
                 claimId: "c2",
                 stance: "disagree",
                 confidence: 0.7,
-                rationale: "Need stronger feedback first"
+                rationale: "Need stronger feedback first",
+                evidence: []
               }
             ],
             summary: "Animation can help when minimal"
@@ -185,7 +193,8 @@ export function createFixtureResult(): ArgueResult {
                 claimId: "c2",
                 stance: "revise",
                 confidence: 0.73,
-                rationale: "Keep only subtle transitions"
+                rationale: "Keep only subtle transitions",
+                evidence: []
               }
             ],
             claimVotes: [
@@ -204,7 +213,8 @@ export function createFixtureResult(): ArgueResult {
                 claimId: "c1",
                 stance: "agree",
                 confidence: 0.81,
-                rationale: "Validation gives deterministic behavior"
+                rationale: "Validation gives deterministic behavior",
+                evidence: []
               }
             ],
             claimVotes: [

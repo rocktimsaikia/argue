@@ -28,7 +28,7 @@ describe("phase schemas", () => {
         fullResponse: "x",
         taskTitle: "demo task",
         summary: "x",
-        extractedClaims: [{ title: "t", statement: "s" }],
+        extractedClaims: [{ title: "t", statement: "s", evidence: [] }],
         judgements: []
       })
     ).not.toThrow();
@@ -41,7 +41,7 @@ describe("phase schemas", () => {
         fullResponse: "x",
         taskTitle: "demo task",
         summary: "x",
-        extractedClaims: [{ title: "t", statement: "s" }],
+        extractedClaims: [{ title: "t", statement: "s", evidence: [] }],
         judgements: [],
         claimVotes: [{ claimId: "c1", vote: "accept" }]
       })
@@ -55,7 +55,7 @@ describe("phase schemas", () => {
         round: 0,
         fullResponse: "x",
         summary: "x",
-        extractedClaims: [{ title: "t", statement: "s" }],
+        extractedClaims: [{ title: "t", statement: "s", evidence: [] }],
         judgements: []
       })
     ).toThrow();
@@ -69,7 +69,7 @@ describe("phase schemas", () => {
         fullResponse: "x",
         taskTitle: "x".repeat(ARGUE_TASK_TITLE_MAX + 1),
         summary: "x",
-        extractedClaims: [{ title: "t", statement: "s" }],
+        extractedClaims: [{ title: "t", statement: "s", evidence: [] }],
         judgements: []
       })
     ).toThrow();
@@ -92,7 +92,8 @@ describe("phase schemas", () => {
             claimId: "c1",
             stance: "disagree",
             confidence: 0.8,
-            rationale: "..."
+            rationale: "...",
+            evidence: []
           }
         ]
       })
@@ -110,7 +111,8 @@ describe("phase schemas", () => {
             claimId: "c1",
             stance: "agree",
             confidence: 0.8,
-            rationale: "..."
+            rationale: "...",
+            evidence: []
           }
         ],
         claimVotes: []
@@ -131,7 +133,7 @@ describe("built-in prompt templates", () => {
           fullResponse: "init a",
           taskTitle: "title from a",
           summary: "init a",
-          extractedClaims: [{ title: "c1", statement: "s1" }],
+          extractedClaims: [{ title: "c1", statement: "s1", evidence: [] }],
           judgements: []
         })
       },
@@ -144,7 +146,7 @@ describe("built-in prompt templates", () => {
           fullResponse: "init b",
           taskTitle: "title from b",
           summary: "init b",
-          extractedClaims: [{ title: "c2", statement: "s2" }],
+          extractedClaims: [{ title: "c2", statement: "s2", evidence: [] }],
           judgements: []
         })
       },
@@ -156,7 +158,7 @@ describe("built-in prompt templates", () => {
           round: 1,
           fullResponse: "debate a",
           summary: "debate a",
-          judgements: [{ claimId: "c2", stance: "agree", confidence: 0.8, rationale: "ok" }]
+          judgements: [{ claimId: "c2", stance: "agree", confidence: 0.8, rationale: "ok", evidence: [] }]
         })
       },
       "round:debate:1:b": {
@@ -167,7 +169,7 @@ describe("built-in prompt templates", () => {
           round: 1,
           fullResponse: "debate b",
           summary: "debate b",
-          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.8, rationale: "ok" }]
+          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.8, rationale: "ok", evidence: [] }]
         })
       },
       "round:final_vote:2:a": {
@@ -178,7 +180,7 @@ describe("built-in prompt templates", () => {
           round: 2,
           fullResponse: "vote a",
           summary: "vote a",
-          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.8, rationale: "ok" }],
+          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.8, rationale: "ok", evidence: [] }],
           claimVotes: [{ claimId: "c1", vote: "accept" }]
         })
       },
@@ -190,7 +192,7 @@ describe("built-in prompt templates", () => {
           round: 2,
           fullResponse: "vote b",
           summary: "vote b",
-          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.8, rationale: "ok" }],
+          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.8, rationale: "ok", evidence: [] }],
           claimVotes: [{ claimId: "c1", vote: "accept" }]
         })
       }
@@ -223,7 +225,7 @@ describe("built-in prompt templates", () => {
           fullResponse: "init a",
           taskTitle: "title from a",
           summary: "init a",
-          extractedClaims: [{ title: "c1", statement: "s1" }],
+          extractedClaims: [{ title: "c1", statement: "s1", evidence: [] }],
           judgements: []
         })
       },
@@ -236,7 +238,7 @@ describe("built-in prompt templates", () => {
           fullResponse: "init b",
           taskTitle: "title from b",
           summary: "init b",
-          extractedClaims: [{ title: "c2", statement: "s2" }],
+          extractedClaims: [{ title: "c2", statement: "s2", evidence: [] }],
           judgements: []
         })
       },
@@ -253,7 +255,8 @@ describe("built-in prompt templates", () => {
               claimId: "c2",
               stance: "disagree",
               confidence: 0.8,
-              rationale: "need change"
+              rationale: "need change",
+              evidence: []
             }
           ]
         })
@@ -271,7 +274,8 @@ describe("built-in prompt templates", () => {
               claimId: "c1",
               stance: "agree",
               confidence: 0.8,
-              rationale: "ok"
+              rationale: "ok",
+              evidence: []
             }
           ]
         })
@@ -289,7 +293,8 @@ describe("built-in prompt templates", () => {
               claimId: "c1",
               stance: "agree",
               confidence: 0.8,
-              rationale: "ok"
+              rationale: "ok",
+              evidence: []
             }
           ],
           claimVotes: [{ claimId: "c1", vote: "accept" }]
@@ -308,7 +313,8 @@ describe("built-in prompt templates", () => {
               claimId: "c1",
               stance: "agree",
               confidence: 0.8,
-              rationale: "ok"
+              rationale: "ok",
+              evidence: []
             }
           ],
           claimVotes: [{ claimId: "c1", vote: "accept" }]

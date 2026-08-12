@@ -125,7 +125,8 @@ describe("createApiRunner", () => {
             claimId: "c-1",
             stance: "agree",
             confidence: 0.9,
-            rationale: "Reason"
+            rationale: "Reason",
+            evidence: []
           }
         ]
       })
@@ -157,7 +158,9 @@ describe("createApiRunner", () => {
           {
             title: "Title 1",
             statement: "Statement 1",
-            category: "pro"
+            category: "pro",
+            // An agent that cites nothing still gets an explicit empty array.
+            evidence: []
           }
         ],
         judgements: [
@@ -165,7 +168,8 @@ describe("createApiRunner", () => {
             claimId: "c-1",
             stance: "agree",
             confidence: 0.9,
-            rationale: "Reason"
+            rationale: "Reason",
+            evidence: []
           }
         ]
       }

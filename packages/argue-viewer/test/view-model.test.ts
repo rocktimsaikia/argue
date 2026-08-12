@@ -27,7 +27,8 @@ describe("view-model helpers", () => {
       claimId: "orphan",
       stance: "agree",
       confidence: 0.5,
-      rationale: "n/a"
+      rationale: "n/a",
+      evidence: []
     });
 
     const insights = buildClaimInsights(result);

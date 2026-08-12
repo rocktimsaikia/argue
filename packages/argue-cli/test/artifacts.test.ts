@@ -22,7 +22,8 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
         statement: "All new code should use async/await over raw promises.",
         category: "pro",
         proposedBy: ["agent-a"],
-        status: "active"
+        status: "active",
+        evidence: []
       },
       {
         claimId: "c2",
@@ -30,7 +31,8 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
         statement: "Callbacks lead to hard-to-read code.",
         category: "con",
         proposedBy: ["agent-b"],
-        status: "active"
+        status: "active",
+        evidence: []
       },
       {
         claimId: "c3",
@@ -48,6 +50,7 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
         acceptCount: 2,
         rejectCount: 0,
         totalVoters: 2,
+        evidenceCount: 0,
         votes: [
           { participantId: "agent-a", claimId: "c1", vote: "accept" },
           { participantId: "agent-b", claimId: "c1", vote: "accept" }
@@ -59,6 +62,7 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
         acceptCount: 1,
         rejectCount: 1,
         totalVoters: 2,
+        evidenceCount: 0,
         votes: [
           { participantId: "agent-a", claimId: "c2", vote: "reject" },
           { participantId: "agent-b", claimId: "c2", vote: "accept" }
@@ -116,7 +120,9 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
             phase: "initial" as const,
             fullResponse: "resp",
             taskTitle: "Standardise on async/await",
-            judgements: [{ claimId: "c1", stance: "agree" as const, confidence: 0.9, rationale: "solid" }],
+            judgements: [
+              { claimId: "c1", stance: "agree" as const, confidence: 0.9, rationale: "solid", evidence: [] }
+            ],
             summary: "I agree"
           },
           {
@@ -125,7 +131,9 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
             phase: "initial" as const,
             fullResponse: "resp",
             taskTitle: "Adopt async/await everywhere",
-            judgements: [{ claimId: "c1", stance: "disagree" as const, confidence: 0.6, rationale: "hmm" }],
+            judgements: [
+              { claimId: "c1", stance: "disagree" as const, confidence: 0.6, rationale: "hmm", evidence: [] }
+            ],
             summary: "I disagree"
           }
         ]
@@ -139,8 +147,8 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
             phase: "debate" as const,
             fullResponse: "resp",
             judgements: [
-              { claimId: "c1", stance: "agree" as const, confidence: 0.95, rationale: "very solid" },
-              { claimId: "c2", stance: "disagree" as const, confidence: 0.7, rationale: "not great" }
+              { claimId: "c1", stance: "agree" as const, confidence: 0.95, rationale: "very solid", evidence: [] },
+              { claimId: "c2", stance: "disagree" as const, confidence: 0.7, rationale: "not great", evidence: [] }
             ],
             summary: "Still agree"
           },
@@ -150,8 +158,8 @@ function makeResult(overrides?: Partial<ArgueResult>): ArgueResult {
             phase: "debate" as const,
             fullResponse: "resp",
             judgements: [
-              { claimId: "c1", stance: "agree" as const, confidence: 0.85, rationale: "convinced" },
-              { claimId: "c2", stance: "agree" as const, confidence: 0.8, rationale: "yes" }
+              { claimId: "c1", stance: "agree" as const, confidence: 0.85, rationale: "convinced", evidence: [] },
+              { claimId: "c2", stance: "agree" as const, confidence: 0.8, rationale: "yes", evidence: [] }
             ],
             summary: "Now I agree"
           }
@@ -343,7 +351,8 @@ describe("buildResultSummary", () => {
             title: "Simple claim",
             statement: "A claim without category.",
             proposedBy: ["agent-a"],
-            status: "active"
+            status: "active",
+            evidence: []
           }
         ]
       })

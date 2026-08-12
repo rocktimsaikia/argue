@@ -47,8 +47,8 @@ function makeParticipantRespondedEvent(overrides: Record<string, unknown> = {}):
       fullResponse: "This is the full LLM response text.",
       extractedClaimsDetail: [{ title: "New finding", statement: "A newly discovered insight.", category: "pro" }],
       judgementsDetail: [
-        { claimId: "c1", stance: "agree", confidence: 0.95, rationale: "Strong evidence supports this." },
-        { claimId: "c2", stance: "disagree", confidence: 0.7, rationale: "Contradicts prior analysis." }
+        { claimId: "c1", stance: "agree", confidence: 0.95, rationale: "Strong evidence supports this.", evidence: [] },
+        { claimId: "c2", stance: "disagree", confidence: 0.7, rationale: "Contradicts prior analysis.", evidence: [] }
       ],
       ...overrides
     }
@@ -68,7 +68,8 @@ function makeMinimalResult(): ArgueResult {
         statement: "The primary conclusion.",
         category: "pro",
         proposedBy: ["agent-a", "agent-b"],
-        status: "active"
+        status: "active",
+        evidence: ["src/core/engine.ts:61"]
       }
     ],
     claimResolutions: [
@@ -78,6 +79,7 @@ function makeMinimalResult(): ArgueResult {
         acceptCount: 2,
         rejectCount: 0,
         totalVoters: 2,
+        evidenceCount: 1,
         votes: [
           { participantId: "agent-a", claimId: "c1", vote: "accept", reason: "Correct." },
           { participantId: "agent-b", claimId: "c1", vote: "accept" }
@@ -278,7 +280,26 @@ describe("output formatter", () => {
       expect(all).toContain("c1: Main claim");
       expect(all).toContain("[pro]");
       expect(all).toContain("proposed by: agent-a, agent-b");
+      expect(all).toContain("evidence: src/core/engine.ts:61");
       expect(all).toContain("resolved: 2/2 accept");
+      expect(all).not.toContain("no evidence");
+    });
+
+    it("flags a claim that was voted through without any evidence", () => {
+      const io = createIO();
+      const fmt = createOutputFormatter(io, { verbose: true, noColor: true });
+      const result = makeMinimalResult();
+      const claim = result.finalClaims[0];
+      const resolution = result.claimResolutions[0];
+      if (!claim || !resolution) throw new Error("fixture must carry one claim and one resolution");
+      claim.evidence = [];
+      resolution.evidenceCount = 0;
+
+      fmt.runCompleted(result, { resultPath: "/out/r.json", summaryPath: "/out/s.md" });
+
+      const all = io.logs.join("\n");
+      expect(all).toContain("resolved (no evidence): 2/2 accept");
+      expect(all).not.toContain("evidence: src");
     });
 
     it("shows representative speech", () => {

@@ -33,7 +33,8 @@ function makeRoundTask(phase: "initial" | "debate" | "final_vote", participantId
         title: "C1",
         statement: "claim",
         proposedBy: ["a1"],
-        status: "active"
+        status: "active",
+        evidence: []
       }
     ]
   };

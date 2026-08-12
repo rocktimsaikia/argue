@@ -22,7 +22,7 @@ describe("DefaultWaitCoordinator", () => {
                 round: 1,
                 fullResponse: "ok",
                 summary: "ok",
-                judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok" }]
+                judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok", evidence: [] }]
               }
             }
           };

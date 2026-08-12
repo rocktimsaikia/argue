@@ -78,7 +78,7 @@ describe("JsonlObserver", () => {
           fullResponse: "init-a",
           taskTitle: "demo task",
           summary: "init-a",
-          extractedClaims: [{ title: "c1", statement: "s1" }],
+          extractedClaims: [{ title: "c1", statement: "s1", evidence: [] }],
           judgements: []
         })
       },
@@ -91,7 +91,7 @@ describe("JsonlObserver", () => {
           fullResponse: "init-b",
           taskTitle: "demo task",
           summary: "init-b",
-          extractedClaims: [{ title: "c1", statement: "s1" }],
+          extractedClaims: [{ title: "c1", statement: "s1", evidence: [] }],
           judgements: []
         })
       },
@@ -103,7 +103,7 @@ describe("JsonlObserver", () => {
           round: 1,
           fullResponse: "debate-a",
           summary: "debate-a",
-          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok" }]
+          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok", evidence: [] }]
         })
       },
       "round:debate:1:b": {
@@ -114,7 +114,7 @@ describe("JsonlObserver", () => {
           round: 1,
           fullResponse: "debate-b",
           summary: "debate-b",
-          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok" }]
+          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok", evidence: [] }]
         })
       },
       "round:final_vote:2:a": {
@@ -125,7 +125,7 @@ describe("JsonlObserver", () => {
           round: 2,
           fullResponse: "vote-a",
           summary: "vote-a",
-          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok" }],
+          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok", evidence: [] }],
           claimVotes: [{ claimId: "c1", vote: "accept" }]
         })
       },
@@ -137,7 +137,7 @@ describe("JsonlObserver", () => {
           round: 2,
           fullResponse: "vote-b",
           summary: "vote-b",
-          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok" }],
+          judgements: [{ claimId: "c1", stance: "agree", confidence: 0.9, rationale: "ok", evidence: [] }],
           claimVotes: [{ claimId: "c1", vote: "accept" }]
         })
       }

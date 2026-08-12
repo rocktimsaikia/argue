@@ -538,7 +538,8 @@ function contentForPhase(
         claimId: id,
         stance: "agree",
         confidence: 0.9,
-        rationale: "Agree"
+        rationale: "Agree",
+        evidence: []
       }))
     };
   }
@@ -550,7 +551,8 @@ function contentForPhase(
       claimId: id,
       stance: "agree",
       confidence: 0.9,
-      rationale: "Agree"
+      rationale: "Agree",
+      evidence: []
     })),
     claimVotes: allClaimIds.map((id) => ({
       claimId: id,
@@ -605,7 +607,7 @@ if (phase === "initial") {
     fullResponse: "CLI debate response",
     summary: "CLI debate summary",
     judgements: catalog.map(c => (
-      { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree" }
+      { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree", evidence: [] }
     ))
   };
 } else {
@@ -614,7 +616,7 @@ if (phase === "initial") {
     fullResponse: "CLI final vote response",
     summary: "CLI final vote summary",
     judgements: catalog.map(c => (
-      { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree" }
+      { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree", evidence: [] }
     )),
     claimVotes: catalog.map(c => (
       { claimId: c.claimId, vote: "accept", reason: "Accept" }
@@ -664,7 +666,7 @@ export function createArgueSdkAdapter(args) {
           fullResponse: "SDK debate response",
           summary: "SDK debate summary",
           judgements: catalog.map(c => (
-            { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree" }
+            { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree", evidence: [] }
           ))
         };
       }
@@ -673,7 +675,7 @@ export function createArgueSdkAdapter(args) {
         fullResponse: "SDK final vote response",
         summary: "SDK final vote summary",
         judgements: catalog.map(c => (
-          { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree" }
+          { claimId: c.claimId, stance: "agree", confidence: 0.9, rationale: "Agree", evidence: [] }
         )),
         claimVotes: catalog.map(c => (
           { claimId: c.claimId, vote: "accept", reason: "Accept" }

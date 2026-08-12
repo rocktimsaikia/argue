@@ -63,7 +63,8 @@ function buildDeterministicOutput(task: AgentTaskInput, agent: ResolvedAgentRunt
         {
           title: `Proposal from ${agent.id}`,
           statement: `${agent.id}${roleSuffix} recommends a concrete next step.`,
-          category: "pro"
+          category: "pro",
+          evidence: [`mock://${agent.id}/initial-source`]
         }
       ],
       judgements: []
@@ -78,7 +79,9 @@ function buildDeterministicOutput(task: AgentTaskInput, agent: ResolvedAgentRunt
         claimId: claim.claimId,
         stance: "agree",
         confidence: 0.9,
-        rationale: `${agent.id} agrees with ${claim.claimId}.`
+        rationale: `${agent.id} agrees with ${claim.claimId}.`,
+        // Agreeing with a source attached: exercises the corroboration path.
+        evidence: [`mock://${agent.id}/corroborates/${claim.claimId}`]
       }))
     };
   }

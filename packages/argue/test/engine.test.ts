@@ -17,12 +17,14 @@ function mkRoundOutput(input: {
     title: string;
     statement: string;
     category?: "pro" | "con" | "risk" | "tradeoff" | "todo";
+    evidence?: string[];
   }>;
   judgements?: Array<{
     claimId: string;
     stance: "agree" | "disagree" | "revise";
     confidence?: number;
     rationale?: string;
+    evidence?: string[];
     revisedStatement?: string;
     mergesWith?: string;
   }>;
@@ -39,16 +41,19 @@ function mkRoundOutput(input: {
     stance: judgement.stance,
     confidence: judgement.confidence ?? 0.9,
     rationale: judgement.rationale ?? `${input.participantId} rationale ${input.phase} ${input.round}`,
+    evidence: judgement.evidence ?? [],
     revisedStatement: judgement.revisedStatement,
     mergesWith: judgement.mergesWith
   }));
-  const extractedClaims = input.extractedClaims ?? [
-    {
-      title: "Claim",
-      statement: "Claim statement",
-      category: "pro" as const
-    }
-  ];
+  const extractedClaims = (
+    input.extractedClaims ?? [
+      {
+        title: "Claim",
+        statement: "Claim statement",
+        category: "pro" as const
+      }
+    ]
+  ).map((claim) => ({ ...claim, evidence: claim.evidence ?? [] }));
   const summary = input.summary ?? `${input.participantId} summary`;
 
   if (input.phase === "initial") {
@@ -1308,9 +1313,16 @@ describe("ArgueEngine M2", () => {
             fullResponse: "onevpaw:debate:1",
             summary: "onevpaw debate summary",
             extractedClaims: [
-              { title: "Missing test coverage", statement: "No integration tests for the new path", category: "risk" }
+              {
+                title: "Missing test coverage",
+                statement: "No integration tests for the new path",
+                category: "risk" as const,
+                evidence: []
+              }
             ],
-            judgements: [{ claimId: "onevclaw:0:0", stance: "agree" as const, confidence: 0.9, rationale: "agree" }]
+            judgements: [
+              { claimId: "onevclaw:0:0", stance: "agree" as const, confidence: 0.9, rationale: "agree", evidence: [] }
+            ]
           }
         }
       },
@@ -2305,5 +2317,186 @@ describe("report transcript compaction", () => {
         expect(output.fullResponse).toBe(LONG);
       }
     }
+  });
+});
+
+describe("claim grounding", () => {
+  /**
+   * onevclaw proposes one claim with a source. In the debate round onevpaw
+   * corroborates it with a second source while onevtail disagrees citing a
+   * third. Only the corroboration may reach the claim.
+   */
+  async function runGroundedDebate() {
+    const claimId = "onevclaw:0:0";
+    const scenarios: Record<string, { type: "success"; output: AgentTaskResult }> = {};
+
+    scenarios["round:initial:0:onevclaw"] = {
+      type: "success",
+      output: roundResult(
+        mkRoundOutput({
+          participantId: "onevclaw",
+          phase: "initial",
+          round: 0,
+          extractedClaims: [
+            { title: "Cited claim", statement: "Backed by a real line", evidence: ["src/core/engine.ts:1"] }
+          ]
+        })
+      )
+    };
+
+    for (const participant of ["onevpaw", "onevtail"] as const) {
+      scenarios[`round:initial:0:${participant}`] = {
+        type: "success",
+        output: roundResult(
+          mkRoundOutput({ participantId: participant, phase: "initial", round: 0, extractedClaims: [] })
+        )
+      };
+    }
+
+    scenarios["round:debate:1:onevclaw"] = {
+      type: "success",
+      output: roundResult(
+        mkRoundOutput({
+          participantId: "onevclaw",
+          phase: "debate",
+          round: 1,
+          judgements: [{ claimId, stance: "agree", rationale: "mine" }]
+        })
+      )
+    };
+
+    scenarios["round:debate:1:onevpaw"] = {
+      type: "success",
+      output: roundResult(
+        mkRoundOutput({
+          participantId: "onevpaw",
+          phase: "debate",
+          round: 1,
+          judgements: [
+            {
+              claimId,
+              stance: "agree",
+              rationale: "checked it",
+              evidence: ["https://example.com/spec", "SRC/CORE/ENGINE.TS:1"]
+            }
+          ]
+        })
+      )
+    };
+
+    scenarios["round:debate:1:onevtail"] = {
+      type: "success",
+      output: roundResult(
+        mkRoundOutput({
+          participantId: "onevtail",
+          phase: "debate",
+          round: 1,
+          judgements: [{ claimId, stance: "disagree", rationale: "contradicted", evidence: ["docs/adr/0002.md:9"] }]
+        })
+      )
+    };
+
+    for (const participant of PARTICIPANTS) {
+      scenarios[`round:final_vote:2:${participant}`] = {
+        type: "success",
+        output: roundResult(
+          mkRoundOutput({
+            participantId: participant,
+            phase: "final_vote",
+            round: 2,
+            catalogClaimIds: [claimId]
+          })
+        )
+      };
+    }
+
+    const result = await new ArgueEngine({ taskDelegate: new StubAgentTaskDelegate(scenarios) }).start({
+      requestId: "req-grounding",
+      task: "Grounding flow",
+      participants: PARTICIPANTS.map((id) => ({ id })),
+      roundPolicy: { minRounds: 1, maxRounds: 1 }
+    });
+
+    return { result, claimId };
+  }
+
+  it("folds corroborating sources into the claim and keeps refuting ones out", async () => {
+    const { result, claimId } = await runGroundedDebate();
+    const claim = result.finalClaims.find((c) => c.claimId === claimId);
+
+    expect(claim?.evidence).toContain("src/core/engine.ts:1");
+    expect(claim?.evidence).toContain("https://example.com/spec");
+    // Cited while disagreeing: argues against the claim, must not ground it.
+    expect(claim?.evidence).not.toContain("docs/adr/0002.md:9");
+    // Case-insensitive duplicate of the proposer's own source stays one entry.
+    expect(claim?.evidence).toHaveLength(2);
+  });
+
+  it("reports how much evidence a resolved claim actually has", async () => {
+    const { result, claimId } = await runGroundedDebate();
+    const resolution = result.claimResolutions.find((r) => r.claimId === claimId);
+
+    expect(resolution?.status).toBe("resolved");
+    expect(resolution?.evidenceCount).toBe(2);
+  });
+
+  it("keeps the merged claim's sources when two claims are deduplicated", async () => {
+    const scenarios: Record<string, { type: "success"; output: AgentTaskResult }> = {};
+
+    for (const [participant, evidence] of [
+      ["onevclaw", "src/a.ts:1"],
+      ["onevpaw", "src/b.ts:2"],
+      ["onevtail", "src/c.ts:3"]
+    ] as const) {
+      scenarios[`round:initial:0:${participant}`] = {
+        type: "success",
+        output: roundResult(
+          mkRoundOutput({
+            participantId: participant,
+            phase: "initial",
+            round: 0,
+            extractedClaims: [{ title: "Same point", statement: "Same point", evidence: [evidence] }]
+          })
+        )
+      };
+    }
+
+    // Everyone folds the later duplicates into the earliest claim.
+    const merges = [
+      { claimId: "onevpaw:0:0", stance: "revise" as const, rationale: "dupe", mergesWith: "onevclaw:0:0" },
+      { claimId: "onevtail:0:0", stance: "revise" as const, rationale: "dupe", mergesWith: "onevclaw:0:0" }
+    ];
+
+    for (const participant of PARTICIPANTS) {
+      scenarios[`round:debate:1:${participant}`] = {
+        type: "success",
+        output: roundResult(
+          mkRoundOutput({ participantId: participant, phase: "debate", round: 1, judgements: merges })
+        )
+      };
+      scenarios[`round:final_vote:2:${participant}`] = {
+        type: "success",
+        output: roundResult(
+          mkRoundOutput({
+            participantId: participant,
+            phase: "final_vote",
+            round: 2,
+            catalogClaimIds: ["onevclaw:0:0"]
+          })
+        )
+      };
+    }
+
+    const result = await new ArgueEngine({ taskDelegate: new StubAgentTaskDelegate(scenarios) }).start({
+      requestId: "req-grounding-merge",
+      task: "Grounding survives merges",
+      participants: PARTICIPANTS.map((id) => ({ id })),
+      roundPolicy: { minRounds: 1, maxRounds: 1 }
+    });
+
+    const survivor = result.finalClaims.find((c) => c.claimId === "onevclaw:0:0");
+
+    expect(survivor?.status).toBe("active");
+    expect(survivor?.evidence).toEqual(expect.arrayContaining(["src/a.ts:1", "src/b.ts:2", "src/c.ts:3"]));
   });
 });

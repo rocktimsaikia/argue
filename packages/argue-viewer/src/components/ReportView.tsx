@@ -292,6 +292,15 @@ export function ReportView({ result }: ReportViewProps) {
                   <div className="claim-statement">
                     <Prose text={claim.statement} />
                   </div>
+                  {claim.evidence.length > 0 ? (
+                    <ul className="claim-evidence">
+                      {claim.evidence.map((source) => (
+                        <li key={source}>{source}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="claim-evidence-empty">no evidence cited</p>
+                  )}
                   <div className="claim-tally">
                     <div>
                       <span>accept</span>

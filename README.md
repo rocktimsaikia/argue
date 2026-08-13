@@ -4,11 +4,26 @@
 
 argue is a structured multi-agent debate engine. Multiple AI agents analyze the same problem independently, challenge each other's claims across rounds, and converge on consensus through voting — producing higher quality results than any single agent alone.
 
+This is a personal fork of [@onevcat/argue](https://github.com/onevcat/argue). It is not published to npm — run it from the repo.
+
 ## Install
 
 ```bash
-npm install -g @onevcat/argue-cli
+git clone -b rocktim https://github.com/rocktimsaikia/argue
+cd argue
+
+npm install
+npm run build              # the bin runs dist/, so this is required
+
+cd packages/argue-cli
+npm link                   # puts `argue` on your PATH, symlinked to this repo
 ```
+
+Check it: `argue --version`.
+
+The link points at `packages/argue-cli/dist/cli.js`, and npm workspaces resolve the library to `packages/argue`. Both halves therefore stay in lockstep with your working tree — which matters, because this fork changes the result schema in the library and the output in the CLI. Installing the published `@onevcat/argue-cli` instead would pair a forked CLI with the upstream library and crash.
+
+**After editing source, run `npm run build`** or the `argue` on your PATH keeps serving the previous `dist/`. `git push` also rebuilds, via the pre-push hook.
 
 ## Configure
 

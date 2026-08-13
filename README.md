@@ -1,7 +1,5 @@
 # argue
 
-**[中文](README_CN.md) | [日本語](README_JP.md)**
-
 > _Follow the argument wherever it leads._ — Socrates, in Plato's _Republic_
 
 argue is a structured multi-agent debate engine. Multiple AI agents analyze the same problem independently, challenge each other's claims across rounds, and converge on consensus through voting — producing higher quality results than any single agent alone.

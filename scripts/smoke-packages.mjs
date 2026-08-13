@@ -64,7 +64,13 @@ async function smokeCli() {
 async function packPackage(cwd) {
   const { stdout } = await execFileAsync("npm", ["pack", "--json"], { cwd });
   const parsed = JSON.parse(stdout);
-  return join(cwd, parsed[0].filename);
+  // npm 11 and earlier report an array of packed packages; npm 12 reports an
+  // object keyed by package name. Accept both so this works on either.
+  const entry = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
+  if (!entry?.filename) {
+    throw new Error(`Could not read a tarball name from 'npm pack --json' output: ${stdout.trim()}`);
+  }
+  return join(cwd, entry.filename);
 }
 
 async function run(command, args, cwd) {

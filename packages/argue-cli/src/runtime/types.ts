@@ -1,6 +1,5 @@
 import type { AgentTaskInput } from "@onevcat/argue";
 import type {
-  ApiProviderConfig,
   CliAgentConfig,
   CliProviderConfig,
   MockProviderConfig,
@@ -43,4 +42,4 @@ export type ProviderFactoryContext = {
   providerName: string;
 };
 
-export type RuntimeProviderConfig = ApiProviderConfig | CliProviderConfig | MockProviderConfig | SdkProviderConfig;
+export type RuntimeProviderConfig = CliProviderConfig | MockProviderConfig | SdkProviderConfig;

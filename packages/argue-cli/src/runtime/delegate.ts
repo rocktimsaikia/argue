@@ -3,7 +3,6 @@ import { dirname, join } from "node:path";
 import type { AgentTaskDelegate, AgentTaskInput, AgentTaskResult } from "@onevcat/argue";
 import type { LoadedCliConfig, ProviderConfig } from "../config.js";
 import type { ResolvedRunPlan } from "../run-plan.js";
-import { createApiRunner } from "./api.js";
 import { createCliRunner } from "./cli.js";
 import { JsonParseError } from "./json.js";
 import { createMockRunner } from "./mock.js";
@@ -148,8 +147,6 @@ async function createRunner(
   configDir: string
 ): Promise<ProviderTaskRunner> {
   switch (provider.type) {
-    case "api":
-      return createApiRunner(providerName, provider);
     case "cli":
       return createCliRunner(provider);
     case "mock":

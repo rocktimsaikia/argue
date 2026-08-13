@@ -114,7 +114,7 @@ describe("runCli command branches", () => {
       [["config", "add-provider", "--type", "mock", "--model-id", "m1"], "Missing provider id"],
       [
         ["config", "add-provider", "--id", "p3", "--type", "api", "--model-id", "m1"],
-        "API provider requires --protocol"
+        "--type must be cli, sdk, or mock"
       ],
       [["config", "add-agent", "--id", "a4", "--provider", "p1"], "Missing model id"],
       [

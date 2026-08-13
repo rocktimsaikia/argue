@@ -17,17 +17,6 @@ const ProviderModelsSchema = z.record(ProviderModelSchema).refine((models) => Ob
   message: "provider.models must contain at least one model"
 });
 
-export const ApiProviderSchema = z
-  .object({
-    type: z.literal("api"),
-    protocol: z.enum(["openai-compatible", "anthropic-compatible"]),
-    baseUrl: z.string().url().optional(),
-    apiKeyEnv: z.string().min(1).optional(),
-    headers: z.record(z.string()).optional(),
-    models: ProviderModelsSchema
-  })
-  .strict();
-
 export const CliProviderSchema = z
   .object({
     type: z.literal("cli"),
@@ -78,12 +67,7 @@ export const MockProviderSchema = z
   })
   .strict();
 
-export const ProviderSchema = z.discriminatedUnion("type", [
-  ApiProviderSchema,
-  CliProviderSchema,
-  SdkProviderSchema,
-  MockProviderSchema
-]);
+export const ProviderSchema = z.discriminatedUnion("type", [CliProviderSchema, SdkProviderSchema, MockProviderSchema]);
 
 export const AgentSchema = z
   .object({
@@ -227,7 +211,6 @@ export const CliConfigSchema = CliConfigSchemaBase.superRefine((config, ctx) => 
 
 export type CliConfig = z.infer<typeof CliConfigSchema>;
 export type ProviderModelConfig = z.infer<typeof ProviderModelSchema>;
-export type ApiProviderConfig = z.infer<typeof ApiProviderSchema>;
 export type CliProviderConfig = z.infer<typeof CliProviderSchema>;
 export type SdkProviderConfig = z.infer<typeof SdkProviderSchema>;
 export type MockProviderConfig = z.infer<typeof MockProviderSchema>;

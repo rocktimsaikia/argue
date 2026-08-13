@@ -49,37 +49,6 @@ For `generic` CLI type, specify `--command` and `--args`:
 argue config add-provider --id custom --type cli --cli-type generic --command my-cli --args "--model,model-name"
 ```
 
-### API-based providers
-
-For direct API access without a CLI. Use `--vendor` for presets or `--protocol` for custom endpoints:
-
-```bash
-# Vendor presets (auto-fill protocol, baseUrl, apiKeyEnv):
-# Anthropic (uses ANTHROPIC_API_KEY)
-argue config add-provider --id anthropic --type api --vendor anthropic --model-id claude-4-sonnet
-
-# OpenAI (uses OPENAI_API_KEY)
-argue config add-provider --id openai --type api --vendor openai --model-id gpt-5.4
-
-# Other vendors: groq, together, mistral, deepseek
-
-# OpenAI-compatible endpoint (Ollama, vLLM, etc.)
-argue config add-provider --id local \
-  --type api --protocol openai-compatible \
-  --base-url http://localhost:11434/v1 \
-  --model-id llama3
-
-# Anthropic-compatible endpoint
-argue config add-provider --id anthropic-proxy \
-  --type api --protocol anthropic-compatible \
-  --base-url https://my-proxy.example.com \
-  --model-id claude-4-sonnet
-
-# Custom API key env var
-argue config add-provider --id custom-api --type api --protocol openai-compatible \
-  --base-url https://api.example.com/v1 --api-key-env MY_API_KEY --model-id my-model
-```
-
 ### SDK-based providers
 
 For custom adapters loaded from Node modules:

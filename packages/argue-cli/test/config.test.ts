@@ -30,8 +30,9 @@ const VALID_CONFIG = {
   },
   providers: {
     p1: {
-      type: "api",
-      protocol: "openai-compatible",
+      type: "cli",
+      cliType: "claude",
+      command: "claude",
       models: {
         m1: {}
       }
@@ -192,9 +193,9 @@ describe("cli config loader", () => {
         "--id",
         "p3",
         "--type",
-        "api",
-        "--protocol",
-        "openai-compatible",
+        "cli",
+        "--cli-type",
+        "claude",
         "--model-id",
         "m3",
         "--provider-model",
@@ -213,7 +214,7 @@ describe("cli config loader", () => {
 
     const loaded = await loadCliConfig({ explicitPath: configPath });
     expect(loaded.config.providers.p3).toBeDefined();
-    expect(loaded.config.providers.p3?.type).toBe("api");
+    expect(loaded.config.providers.p3?.type).toBe("cli");
     expect(loaded.config.providers.p3?.models.m3?.providerModel).toBe("gpt-5-mini");
   });
 
@@ -396,106 +397,6 @@ describe("cli config loader", () => {
     const json = JSON.parse(raw) as { providers: Record<string, unknown>; agents: Array<{ id: string }> };
     expect(Object.keys(json.providers)).toHaveLength(2);
     expect(json.agents.some((agent) => agent.id === "a4")).toBe(false);
-  });
-
-  it("adds api provider via --vendor preset", async () => {
-    const root = await mkdtemp(join(tmpdir(), "argue-cli-vendor-"));
-    const configPath = join(root, "argue.config.json");
-    await writeJson(configPath, VALID_CONFIG);
-
-    const result = await runCli(
-      [
-        "config",
-        "add-provider",
-        "--config",
-        configPath,
-        "--id",
-        "anth",
-        "--type",
-        "api",
-        "--vendor",
-        "anthropic",
-        "--model-id",
-        "claude-sonnet-4-5"
-      ],
-      { log: () => {}, error: () => {} }
-    );
-
-    expect(result.ok).toBe(true);
-    const loaded = await loadCliConfig({ explicitPath: configPath });
-    const p = loaded.config.providers.anth;
-    expect(p?.type).toBe("api");
-    expect(p && "protocol" in p && p.protocol).toBe("anthropic-compatible");
-    expect(p && "apiKeyEnv" in p && p.apiKeyEnv).toBe("ANTHROPIC_API_KEY");
-  });
-
-  it("vendor preset can be overridden by explicit flags", async () => {
-    const root = await mkdtemp(join(tmpdir(), "argue-cli-vendor-override-"));
-    const configPath = join(root, "argue.config.json");
-    await writeJson(configPath, VALID_CONFIG);
-
-    const result = await runCli(
-      [
-        "config",
-        "add-provider",
-        "--config",
-        configPath,
-        "--id",
-        "custom-groq",
-        "--type",
-        "api",
-        "--vendor",
-        "groq",
-        "--model-id",
-        "llama-3",
-        "--api-key-env",
-        "MY_KEY"
-      ],
-      { log: () => {}, error: () => {} }
-    );
-
-    expect(result.ok).toBe(true);
-    const loaded = await loadCliConfig({ explicitPath: configPath });
-    const p = loaded.config.providers["custom-groq"];
-    expect(p && "apiKeyEnv" in p && p.apiKeyEnv).toBe("MY_KEY");
-    expect(p && "baseUrl" in p && p.baseUrl).toBe("https://api.groq.com/openai/v1");
-  });
-
-  it("rejects --vendor on non-api type", async () => {
-    const errors: string[] = [];
-    const result = await runCli(
-      [
-        "config",
-        "add-provider",
-        "--id",
-        "bad",
-        "--type",
-        "cli",
-        "--vendor",
-        "anthropic",
-        "--cli-type",
-        "claude",
-        "--command",
-        "claude",
-        "--model-id",
-        "m"
-      ],
-      { log: () => {}, error: (msg: string) => errors.push(msg) }
-    );
-
-    expect(result.ok).toBe(false);
-    expect(errors.some((x) => x.includes("--vendor is only valid for --type api"))).toBe(true);
-  });
-
-  it("rejects unknown vendor name", async () => {
-    const errors: string[] = [];
-    const result = await runCli(
-      ["config", "add-provider", "--id", "bad", "--type", "api", "--vendor", "nonexistent", "--model-id", "m"],
-      { log: () => {}, error: (msg: string) => errors.push(msg) }
-    );
-
-    expect(result.ok).toBe(false);
-    expect(errors.some((x) => x.includes("--vendor must be one of:"))).toBe(true);
   });
 
   it("run command resolves plan with precedence: flags > input > defaults", async () => {

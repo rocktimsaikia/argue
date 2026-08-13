@@ -23,7 +23,6 @@ import { defaultOutputDirTemplate, resolveRunPlan } from "./run-plan.js";
 import { createTaskDelegate } from "./runtime/delegate.js";
 import { createSpinner } from "./spinner.js";
 import { MAX_ENCODED_BYTES, openReportInViewer, resolveLatestRequestId } from "./view.js";
-import { VENDOR_PRESETS, getVendorNames } from "./vendors.js";
 export type { CliSdkProviderAdapter, CreateCliSdkProviderAdapter, ProviderTaskRunnerArgs } from "./runtime/types.js";
 
 export type CliRunOptions = {
@@ -61,13 +60,9 @@ export type CliRunOptions = {
 type ConfigAddProviderOptions = {
   configPath?: string;
   id: string;
-  type: "api" | "cli" | "sdk" | "mock";
+  type: "cli" | "sdk" | "mock";
   modelId: string;
   providerModel?: string;
-  vendor?: string;
-  protocol?: "openai-compatible" | "anthropic-compatible";
-  baseUrl?: string;
-  apiKeyEnv?: string;
   cliType?: "codex" | "claude" | "copilot" | "gemini" | "pi" | "opencode" | "droid" | "amp" | "generic";
   command?: string;
   args?: string[];
@@ -1062,8 +1057,8 @@ function parseConfigAddProviderOptions(
 
     if (arg === "--type") {
       const value = args[i + 1];
-      if (!value || (value !== "api" && value !== "cli" && value !== "sdk" && value !== "mock")) {
-        return { ok: false, error: "--type must be api, cli, sdk, or mock" };
+      if (!value || (value !== "cli" && value !== "sdk" && value !== "mock")) {
+        return { ok: false, error: "--type must be cli, sdk, or mock" };
       }
       out.type = value;
       i += 1;
@@ -1082,43 +1077,6 @@ function parseConfigAddProviderOptions(
       const value = args[i + 1];
       if (!value) return { ok: false, error: "--provider-model requires a value" };
       out.providerModel = value;
-      i += 1;
-      continue;
-    }
-
-    if (arg === "--protocol") {
-      const value = args[i + 1];
-      if (!value || (value !== "openai-compatible" && value !== "anthropic-compatible")) {
-        return { ok: false, error: "--protocol must be openai-compatible or anthropic-compatible" };
-      }
-      out.protocol = value;
-      i += 1;
-      continue;
-    }
-
-    if (arg === "--base-url") {
-      const value = args[i + 1];
-      if (!value) return { ok: false, error: "--base-url requires a value" };
-      out.baseUrl = value;
-      i += 1;
-      continue;
-    }
-
-    if (arg === "--api-key-env") {
-      const value = args[i + 1];
-      if (!value) return { ok: false, error: "--api-key-env requires a value" };
-      out.apiKeyEnv = value;
-      i += 1;
-      continue;
-    }
-
-    if (arg === "--vendor") {
-      const value = args[i + 1];
-      const names = getVendorNames();
-      if (!value || !names.includes(value)) {
-        return { ok: false, error: `--vendor must be one of: ${names.join(", ")}` };
-      }
-      out.vendor = value;
       i += 1;
       continue;
     }
@@ -1188,24 +1146,8 @@ function parseConfigAddProviderOptions(
   }
 
   if (!out.id) return { ok: false, error: "Missing provider id. Use --id <provider-id>." };
-  if (!out.type) return { ok: false, error: "Missing provider type. Use --type <api|cli|sdk|mock>." };
+  if (!out.type) return { ok: false, error: "Missing provider type. Use --type <cli|sdk|mock>." };
   if (!out.modelId) return { ok: false, error: "Missing model id. Use --model-id <model-id>." };
-
-  if (out.vendor && out.type !== "api") {
-    return { ok: false, error: "--vendor is only valid for --type api." };
-  }
-
-  if (out.type === "api") {
-    if (out.vendor) {
-      const preset = VENDOR_PRESETS[out.vendor]!;
-      if (!out.protocol) out.protocol = preset.protocol;
-      if (!out.baseUrl && preset.baseUrl) out.baseUrl = preset.baseUrl;
-      if (!out.apiKeyEnv && preset.apiKeyEnv) out.apiKeyEnv = preset.apiKeyEnv;
-    }
-    if (!out.protocol) {
-      return { ok: false, error: "API provider requires --protocol or --vendor." };
-    }
-  }
 
   if (out.type === "cli") {
     if (!out.cliType) {
@@ -1318,16 +1260,6 @@ function parseConfigAddAgentOptions(
 function buildProviderFromOptions(options: ConfigAddProviderOptions): unknown {
   const modelConfig: Record<string, unknown> = {};
   modelConfig[options.modelId] = options.providerModel ? { providerModel: options.providerModel } : {};
-
-  if (options.type === "api") {
-    return ProviderSchema.parse({
-      type: "api",
-      protocol: options.protocol,
-      ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
-      ...(options.apiKeyEnv ? { apiKeyEnv: options.apiKeyEnv } : {}),
-      models: modelConfig
-    });
-  }
 
   if (options.type === "cli") {
     return ProviderSchema.parse({
@@ -1475,11 +1407,9 @@ function printHelp(io: Pick<typeof console, "log">): void {
   io.log("Config commands:");
   io.log("  argue config init [-c <path>] [--local|--project|--global]");
   io.log(
-    "  argue config add-provider --id <provider-id> --type <api|cli|sdk|mock> --model-id <model-id> [--agent <agent-id>] [type options]"
+    "  argue config add-provider --id <provider-id> --type <cli|sdk|mock> --model-id <model-id> [--agent <agent-id>] [type options]"
   );
-  io.log(
-    `    api options: --vendor <${getVendorNames().join("|")}> | --protocol <openai-compatible|anthropic-compatible> [--base-url <url>] [--api-key-env <ENV_VAR>]`
-  );
+  io.log();
   io.log(
     "    cli options: --cli-type <codex|claude|copilot|gemini|pi|opencode|droid|amp|generic> [--command <binary>] [--args a,b,c]"
   );

@@ -7,6 +7,8 @@ import { createSpinner, type SpinnerStream } from "./spinner.js";
 
 export type OutputOptions = {
   verbose?: boolean;
+  /** Column budget for wrapped agent prose. Defaults to the terminal width. */
+  width?: number;
   noColor?: boolean;
   isTTY?: boolean;
   spinnerStream?: SpinnerStream;
@@ -40,6 +42,7 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
 
   const tag = c.cyan("[argue]");
   const verbose = options.verbose ?? false;
+  const width = Math.max(40, options.width ?? process.stdout.columns ?? 100);
 
   /**
    * Per-round tally used by the default output, which prints one line per
@@ -55,6 +58,7 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
     timedOut: number;
     failed: number;
   } | null = null;
+  let roundsStarted = 0;
 
   const spinnerStream = options.spinnerStream ?? null;
   const spinnerIsTTY = options.spinnerIsTTY ?? spinnerStream?.isTTY ?? false;
@@ -92,15 +96,48 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
 
   function beginRound(label: string): void {
     roundTally = { label, responded: [], eliminated: [], newClaims: 0, merges: 0, timedOut: 0, failed: 0 };
+    // Separator goes before the header, not after the notes, so a late event
+    // like an early-stop notice still reads as belonging to the round above it.
+    if (roundsStarted > 0) io.log("");
+    roundsStarted += 1;
+    io.log(c.bold(label));
   }
 
-  /** One settled line per round: who answered, and anything non-zero. */
+  /**
+   * What each agent actually argued, printed the moment it lands rather than
+   * batched at the end of the round: during a multi-minute round this is the
+   * only real progress signal, and reading the reasoning is the point of the
+   * tool. The full response stays behind --verbose.
+   *
+   * The name sits on its own line so the prose keeps the full terminal width.
+   * Hanging it off the name instead costs a column of indent per character of
+   * the longest agent id, which is a lot of lost width for a long roster.
+   */
+  function printAgentSummary(participantId: string, summary: string): void {
+    // Blank line between speakers, but not between the header and the first.
+    if ((roundTally?.responded.length ?? 0) > 1) io.log("");
+
+    io.log(`  ${c.bold(participantId)}:`);
+    for (const line of wrapText(singleLine(summary), width - 2)) {
+      io.log(`  ${line}`);
+    }
+  }
+
+  /**
+   * Round bookkeeping shares the left margin with agent prose, so it needs a
+   * blank line and a marker to stay distinguishable — including in a piped log
+   * where the dim colour is gone.
+   */
+  function printRoundNote(text: string): void {
+    io.log("");
+    io.log(c.dim(`  · ${text}`));
+  }
+
+  /** Closes a round, but only when something non-zero happened in it. */
   function flushRound(): void {
     if (!roundTally) return;
     const tally = roundTally;
     roundTally = null;
-
-    const ticks = tally.responded.map(() => c.green("✓")).join("") + tally.eliminated.map(() => c.red("✗")).join("");
 
     const notes = [
       tally.newClaims > 0 ? `+${tally.newClaims} claims` : null,
@@ -109,8 +146,9 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
       tally.failed > 0 ? c.red(`${tally.failed} failed`) : null
     ].filter(Boolean);
 
-    const detail = notes.length > 0 ? notes.join(", ") : c.dim("no change");
-    io.log(`  ${c.bold(pad(tally.label, 9))}${ticks}  ${detail}`);
+    if (notes.length > 0) {
+      printRoundNote(notes.join(", "));
+    }
   }
 
   return {
@@ -193,6 +231,10 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
 
           if (!verbose) {
             roundTally?.responded.push(participantId);
+            const quietSummary = readString(payload.summary);
+            if (quietSummary) {
+              printAgentSummary(participantId, quietSummary);
+            }
             waitingFor.delete(participantId);
             if (waitingFor.size > 0) {
               spinner?.start(waitLabel(phase, round, waitingFor));
@@ -229,10 +271,11 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
           }
 
           roundTally?.eliminated.push(participantId);
+          if (!verbose) io.log("");
           io.log(
             verbose
               ? `${tag} ${c.bold(roundTag)} ${c.red(`${participantId} eliminated`)} ${c.dim(suffix)}`
-              : `  ${c.red(`${participantId} eliminated`)} ${c.dim(`${phaseLabel(phase, round)} ${suffix}`)}`
+              : `  ${c.red(`${participantId} eliminated`)} ${c.dim(suffix)}`
           );
           waitingFor.delete(participantId);
           if (waitingFor.size > 0) {
@@ -292,7 +335,11 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
         }
 
         if (event.type === "EarlyStopTriggered") {
-          io.log(verbose ? `${tag} ${c.yellow(`early stop triggered at ${roundTag}`)}` : c.dim("  early stop"));
+          if (verbose) {
+            io.log(`${tag} ${c.yellow(`early stop triggered at ${roundTag}`)}`);
+          } else {
+            printRoundNote("early stop");
+          }
           return;
         }
 
@@ -673,6 +720,29 @@ function plainText(value: string): string {
     .replace(/\*\*(.+?)\*\*/gs, "$1")
     .replace(/__(.+?)__/gs, "$1")
     .replace(/^#{1,6}\s+/gm, "");
+}
+
+/** Greedy word wrap. Words longer than the budget get their own line rather than being cut. */
+function wrapText(value: string, maxChars: number): string[] {
+  const budget = Math.max(20, maxChars);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of value.split(" ")) {
+    if (current.length === 0) {
+      current = word;
+      continue;
+    }
+    if (current.length + 1 + word.length <= budget) {
+      current += ` ${word}`;
+      continue;
+    }
+    lines.push(current);
+    current = word;
+  }
+
+  if (current.length > 0) lines.push(current);
+  return lines.length > 0 ? lines : [""];
 }
 
 function truncate(value: string, maxChars: number): string {

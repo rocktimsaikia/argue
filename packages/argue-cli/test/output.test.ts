@@ -135,7 +135,7 @@ function makeMinimalResult(): ArgueResult {
 
 describe("output formatter", () => {
   describe("non-verbose mode", () => {
-    it("says nothing per agent, and settles the round in one line", () => {
+    it("prints each agent's own words as it responds, and only non-zero round notes", () => {
       const io = createIO();
       const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
       const handler = fmt.createEventHandler();
@@ -149,8 +149,10 @@ describe("output formatter", () => {
       });
       handler(makeParticipantRespondedEvent());
 
-      // An individual response is tallied, not narrated.
-      expect(io.logs.join("\n")).toBe("");
+      // The agent's own summary is the progress signal worth reading.
+      const afterResponse = io.logs.join("\n");
+      expect(afterResponse).toContain("agent-a");
+      expect(afterResponse).toContain("I agree with the main claim.");
 
       handler({
         type: "RoundCompleted",
@@ -163,11 +165,47 @@ describe("output formatter", () => {
       const all = io.logs.join("\n");
       expect(all).toContain("debate 1");
       expect(all).toContain("+3 claims");
-      // Zeros are silence, and per-agent detail belongs to --verbose.
+      // Zeros stay silent, and the raw response body belongs to --verbose.
       expect(all).not.toContain("timeout");
       expect(all).not.toContain("failed");
       expect(all).not.toContain("full response:");
       expect(all).not.toContain("Strong evidence");
+      expect(all).not.toContain("judgements=");
+    });
+
+    it("prints the agent name on its own line and wraps the prose full width", () => {
+      const io = createIO();
+      const fmt = createOutputFormatter(io, { verbose: false, noColor: true, width: 60 });
+      const handler = fmt.createEventHandler();
+
+      handler({
+        type: "ParticipantResponded",
+        at: "2024-01-01T00:00:00.000Z",
+        sessionId: "s1",
+        requestId: "r1",
+        payload: {
+          phase: "debate",
+          round: 1,
+          participantId: "agent-a",
+          summary:
+            "Prefer a set for repeated membership tests on hashable keys, because conversion pays for itself at roughly the third lookup.",
+          judgements: 0
+        }
+      });
+
+      const lines = io.logs.join("\n").split("\n");
+      expect(lines[0]).toBe("  agent-a:");
+      // Prose keeps the full width at a flat two-column indent, so a long
+      // agent id costs nothing; the wrap must not lose the tail of the text.
+      expect(lines.length).toBeGreaterThan(2);
+      for (const line of lines.slice(1)) {
+        expect(line.startsWith("  ")).toBe(true);
+        expect(line.startsWith("   ")).toBe(false);
+      }
+      for (const line of lines) {
+        expect(line.length).toBeLessThanOrEqual(60);
+      }
+      expect(io.logs.join(" ")).toContain("third lookup.");
     });
 
     it("still reports an eliminated agent, because that is an exception", () => {

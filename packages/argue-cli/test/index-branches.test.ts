@@ -475,8 +475,11 @@ describe("runCli command branches", () => {
     expect(result).toEqual({ ok: true, code: 0 });
     // The default output reports one settled line per round rather than a
     // dispatched/responded/completed trio per agent.
-    expect(io.logs.some((x) => x.includes("initial") && x.includes("✓") && x.includes("claims"))).toBe(true);
-    expect(io.logs.some((x) => x.includes("vote") && x.includes("✓"))).toBe(true);
+    // A round header, each agent named on its own line with its prose beneath,
+    // then non-zero round notes.
+    expect(io.logs.some((x) => x === "initial")).toBe(true);
+    expect(io.logs.some((x) => x.trim() === "a1:")).toBe(true);
+    expect(io.logs.some((x) => x.includes("claims"))).toBe(true);
     expect(io.logs.every((x) => !x.includes("dispatched"))).toBe(true);
   });
 });

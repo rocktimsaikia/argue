@@ -204,9 +204,21 @@ describe("output formatter", () => {
       expect(all).toContain("c1");
       expect(all).toContain("2/2 accept");
       expect(all).toContain("no evidence");
-      // One directory beats two absolute paths.
-      expect(all).toContain("artifacts: /out/run");
-      expect(all).not.toContain("/out/run/r.json");
+      // The result JSON is what gets piped onward, so name it in full; the
+      // summary shares its directory and does not need its own line.
+      expect(all).toContain("result: /out/run/r.json");
+      expect(all).not.toContain("summary:");
+    });
+
+    it("names the summary separately when it was pointed elsewhere", () => {
+      const io = createIO();
+      const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
+
+      fmt.runCompleted(makeMinimalResult(), { resultPath: "/out/run/r.json", summaryPath: "/elsewhere/s.md" });
+
+      const all = io.logs.join("\n");
+      expect(all).toContain("result: /out/run/r.json");
+      expect(all).toContain("summary: /elsewhere/s.md");
     });
 
     it("strips markdown emphasis the terminal cannot render", () => {

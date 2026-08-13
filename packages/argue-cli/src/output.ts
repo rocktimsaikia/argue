@@ -441,20 +441,18 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
   }
 
   /**
-   * Artefacts share one directory unless the caller overrode the paths, so
-   * name the directory once instead of printing two long absolute paths.
+   * The result JSON is the artefact that gets piped into the next step, so it
+   * is named in full — it also spells out the run directory the summary and
+   * events sit in. The summary only earns its own line when the caller pointed
+   * it somewhere else.
    */
   function printArtifacts(paths: { resultPath: string; summaryPath: string }): void {
     io.log("");
-    const resultDir = dirname(paths.resultPath);
-
-    if (resultDir === dirname(paths.summaryPath)) {
-      io.log(c.dim(`  artifacts: ${contractPath(resultDir)}`));
-      return;
-    }
-
     io.log(c.dim(`  result: ${contractPath(paths.resultPath)}`));
-    io.log(c.dim(`  summary: ${contractPath(paths.summaryPath)}`));
+
+    if (dirname(paths.resultPath) !== dirname(paths.summaryPath)) {
+      io.log(c.dim(`  summary: ${contractPath(paths.summaryPath)}`));
+    }
   }
 
   function printVerboseResponse(payload: Record<string, unknown>): void {

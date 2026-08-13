@@ -89,11 +89,6 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
       .join("\n");
   }
 
-  /** Pads before colouring: ANSI escapes would otherwise count as width. */
-  function pad(text: string, width: number): string {
-    return text.length >= width ? text : text + " ".repeat(width - text.length);
-  }
-
   function beginRound(label: string): void {
     roundTally = { label, responded: [], eliminated: [], newClaims: 0, merges: 0, timedOut: 0, failed: 0 };
     // Separator goes before the header, not after the notes, so a late event
@@ -417,7 +412,7 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
           io.log(indent(plainText(result.report.finalSummary), "  "));
         }
 
-        printClaimDigest(result);
+        printClaimTally(result);
         printArtifacts(paths);
         return;
       }
@@ -457,34 +452,28 @@ export function createOutputFormatter(io: OutputIO, options: OutputOptions = {})
   };
 
   /**
-   * The surviving claims, one line each, with what backs them. Merged and
-   * withdrawn claims are omitted: they are bookkeeping, not conclusions.
+   * Claim-by-claim detail belongs in the report and the JSON, not on a terminal
+   * that has to scroll past twenty-odd rows to reach the verdict. What survives
+   * is the count — plus the number of claims the agents voted through without a
+   * single source, which is the failure mode the evidence work exists to catch
+   * and the one thing a reader cannot infer from the summary above.
    */
-  function printClaimDigest(result: ArgueResult): void {
+  function printClaimTally(result: ArgueResult): void {
     const active = result.finalClaims.filter((claim) => claim.status === "active");
     if (active.length === 0) return;
 
-    const idWidth = Math.max(...active.map((claim) => claim.claimId.length));
-    const titles = new Map(active.map((claim) => [claim.claimId, truncate(claim.title, 44)]));
-    const titleWidth = Math.max(...[...titles.values()].map((title) => title.length));
-    io.log("");
+    const activeIds = new Set(active.map((claim) => claim.claimId));
+    const resolutions = result.claimResolutions.filter((r) => activeIds.has(r.claimId));
+    const resolved = resolutions.filter((r) => r.status === "resolved");
+    const ungrounded = resolved.filter((r) => r.evidenceCount === 0).length;
 
-    for (const claim of active) {
-      const resolution = result.claimResolutions.find((r) => r.claimId === claim.claimId);
-      const verdict = resolution
-        ? (resolution.status === "resolved" ? c.green : c.red)(
-            `${resolution.acceptCount}/${resolution.totalVoters} ${resolution.status === "resolved" ? "accept" : "unresolved"}`
-          )
-        : c.dim("no vote");
-
-      const sources =
-        claim.evidence.length > 0
-          ? c.dim(`${claim.evidence.length} source${claim.evidence.length === 1 ? "" : "s"}`)
-          : c.yellow("no evidence");
-
-      const title = titles.get(claim.claimId) ?? claim.title;
-      io.log(`  ${c.dim(pad(claim.claimId, idWidth))}  ${pad(title, titleWidth)}  ${verdict}  ${sources}`);
+    const parts = [c.dim(`${resolved.length}/${active.length} claims resolved`)];
+    if (ungrounded > 0) {
+      parts.push(c.yellow(`${ungrounded} with no evidence`));
     }
+
+    io.log("");
+    io.log(`  ${c.dim("·")} ${parts.join(c.dim(", "))}`);
   }
 
   /**

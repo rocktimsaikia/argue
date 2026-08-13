@@ -226,7 +226,7 @@ describe("output formatter", () => {
       expect(all).toContain("timeout");
     });
 
-    it("digests surviving claims with their grounding and one artifacts line", () => {
+    it("counts the claims instead of listing them, and flags unsourced consensus", () => {
       const io = createIO();
       const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
       const result = makeMinimalResult();
@@ -239,13 +239,26 @@ describe("output formatter", () => {
       fmt.runCompleted(result, { resultPath: "/out/run/r.json", summaryPath: "/out/run/s.md" });
 
       const all = io.logs.join("\n");
-      expect(all).toContain("c1");
-      expect(all).toContain("2/2 accept");
-      expect(all).toContain("no evidence");
+      // A per-claim table would scroll the verdict off screen; the count plus
+      // the unsourced warning is what a reader cannot get from the summary.
+      expect(all).toContain("1/1 claims resolved");
+      expect(all).toContain("1 with no evidence");
+      expect(all).not.toContain("Main claim");
       // The result JSON is what gets piped onward, so name it in full; the
       // summary shares its directory and does not need its own line.
       expect(all).toContain("result: /out/run/r.json");
       expect(all).not.toContain("summary:");
+    });
+
+    it("stays quiet about evidence when every resolved claim has some", () => {
+      const io = createIO();
+      const fmt = createOutputFormatter(io, { verbose: false, noColor: true });
+
+      fmt.runCompleted(makeMinimalResult(), { resultPath: "/out/run/r.json", summaryPath: "/out/run/s.md" });
+
+      const all = io.logs.join("\n");
+      expect(all).toContain("1/1 claims resolved");
+      expect(all).not.toContain("no evidence");
     });
 
     it("names the summary separately when it was pointed elsewhere", () => {

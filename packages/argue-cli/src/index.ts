@@ -57,13 +57,21 @@ export type CliRunOptions = {
   viewerUrl?: string;
 };
 
+const CLI_TYPES = ["codex", "claude", "copilot", "gemini", "pi", "opencode", "droid", "amp", "generic"] as const;
+
+type CliType = (typeof CLI_TYPES)[number];
+
+function isCliType(value: string): value is CliType {
+  return (CLI_TYPES as readonly string[]).includes(value);
+}
+
 type ConfigAddProviderOptions = {
   configPath?: string;
   id: string;
   type: "cli" | "sdk" | "mock";
   modelId: string;
   providerModel?: string;
-  cliType?: "codex" | "claude" | "copilot" | "gemini" | "pi" | "opencode" | "droid" | "amp" | "generic";
+  cliType?: CliType;
   command?: string;
   args?: string[];
   adapter?: string;
@@ -1083,21 +1091,10 @@ function parseConfigAddProviderOptions(
 
     if (arg === "--cli-type") {
       const value = args[i + 1];
-      const validCliTypes = [
-        "codex",
-        "claude",
-        "copilot",
-        "gemini",
-        "pi",
-        "opencode",
-        "droid",
-        "amp",
-        "generic"
-      ] as const;
-      if (!value || !validCliTypes.includes(value as (typeof validCliTypes)[number])) {
-        return { ok: false, error: `--cli-type must be one of: ${validCliTypes.join(", ")}` };
+      if (!value || !isCliType(value)) {
+        return { ok: false, error: `--cli-type must be one of: ${CLI_TYPES.join(", ")}` };
       }
-      out.cliType = value as (typeof validCliTypes)[number];
+      out.cliType = value;
       i += 1;
       continue;
     }
@@ -1146,14 +1143,23 @@ function parseConfigAddProviderOptions(
   }
 
   if (!out.id) return { ok: false, error: "Missing provider id. Use --id <provider-id>." };
-  if (!out.type) return { ok: false, error: "Missing provider type. Use --type <cli|sdk|mock>." };
   if (!out.modelId) return { ok: false, error: "Missing model id. Use --model-id <model-id>." };
 
+  // Every provider worth adding by hand drives a CLI binary; sdk and mock are
+  // for tests and custom adapters, so they can spell themselves out.
+  out.type ??= "cli";
+
   if (out.type === "cli") {
+    // A provider id is almost always the tool's own name, so `--id claude`
+    // already says --cli-type claude. Only an alias (an `antigravity` provider
+    // speaking the copilot protocol, say) has to be explicit.
+    if (!out.cliType && isCliType(out.id)) {
+      out.cliType = out.id;
+    }
     if (!out.cliType) {
       return {
         ok: false,
-        error: "CLI provider requires --cli-type <codex|claude|copilot|gemini|pi|opencode|droid|amp|generic>."
+        error: `Provider id '${out.id}' is not a CLI tool name, so --cli-type is required. One of: ${CLI_TYPES.join(", ")}.`
       };
     }
     if (!out.command) {
@@ -1407,7 +1413,7 @@ function printHelp(io: Pick<typeof console, "log">): void {
   io.log("Config commands:");
   io.log("  argue config init [-c <path>] [--local|--project|--global]");
   io.log(
-    "  argue config add-provider --id <provider-id> --type <cli|sdk|mock> --model-id <model-id> [--agent <agent-id>] [type options]"
+    "  argue config add-provider --id <provider-id> --model-id <model-id> [--agent <agent-id>] [--type cli|sdk|mock] [type options]"
   );
   io.log();
   io.log(

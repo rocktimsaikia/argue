@@ -25,20 +25,20 @@ argue config init -c /path/to/config.json
 
 ### CLI-based providers (recommended)
 
-Agents run via their respective CLIs — no API keys needed if you're already authenticated:
+Agents run via their respective CLIs — no API keys needed if you're already authenticated. A provider id that names a CLI tool implies `--type cli --cli-type <same>`, so both can be omitted:
 
 ```bash
 # OpenAI Codex CLI
-argue config add-provider --id codex --type cli --cli-type codex --model-id gpt-5.4
+argue config add-provider --id codex --model-id gpt-5.4
 
 # Google Gemini CLI
-argue config add-provider --id gemini --type cli --cli-type gemini --model-id gemini-3.1-pro-preview
+argue config add-provider --id gemini --model-id gemini-3.1-pro-preview
 
 # Anthropic Claude CLI
-argue config add-provider --id claude --type cli --cli-type claude --model-id claude-4-sonnet
+argue config add-provider --id claude --model-id claude-4-sonnet
 
 # GitHub Copilot CLI
-argue config add-provider --id copilot --type cli --cli-type copilot --model-id gpt-5.4
+argue config add-provider --id copilot --model-id gpt-5.4
 
 # Other CLI types: pi, opencode, droid, amp, generic
 ```
@@ -46,7 +46,7 @@ argue config add-provider --id copilot --type cli --cli-type copilot --model-id 
 For `generic` CLI type, specify `--command` and `--args`:
 
 ```bash
-argue config add-provider --id custom --type cli --cli-type generic --command my-cli --args "--model,model-name"
+argue config add-provider --id custom --cli-type generic --command my-cli --args "--model,model-name"
 ```
 
 ### SDK-based providers
@@ -88,7 +88,7 @@ argue config add-agent --id creative-agent --provider openai --model gpt-5.4 --t
 Add `--agent <id>` to `add-provider` to create both at once:
 
 ```bash
-argue config add-provider --id codex --type cli --cli-type codex --model-id gpt-5.4 --agent codex-agent
+argue config add-provider --id codex --model-id gpt-5.4 --agent codex-agent
 ```
 
 ### Provider-Model Aliasing
@@ -96,7 +96,7 @@ argue config add-provider --id codex --type cli --cli-type codex --model-id gpt-
 Use `--provider-model` to map a generic model ID to the provider's actual model name:
 
 ```bash
-argue config add-provider --id codex --type cli --cli-type codex --model-id gpt5 --provider-model gpt-5.4
+argue config add-provider --id codex --model-id gpt5 --provider-model gpt-5.4
 ```
 
 ## Removing Providers/Agents

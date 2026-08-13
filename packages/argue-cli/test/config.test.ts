@@ -218,6 +218,69 @@ describe("cli config loader", () => {
     expect(loaded.config.providers.p3?.models.m3?.providerModel).toBe("gpt-5-mini");
   });
 
+  it("infers --type cli and --cli-type from a provider id that names a CLI tool", async () => {
+    const root = await mkdtemp(join(tmpdir(), "argue-cli-inferred-"));
+    const configPath = join(root, "argue.config.json");
+    await writeJson(configPath, VALID_CONFIG);
+
+    const result = await runCli(
+      ["config", "add-provider", "--config", configPath, "--id", "codex", "--model-id", "gpt-5.6-sol"],
+      { log: () => {}, error: () => {} }
+    );
+
+    expect(result.ok).toBe(true);
+    const loaded = await loadCliConfig({ explicitPath: configPath });
+    const provider = loaded.config.providers.codex;
+    expect(provider?.type).toBe("cli");
+    if (provider?.type === "cli") {
+      expect(provider.cliType).toBe("codex");
+      expect(provider.command).toBe("codex");
+    }
+  });
+
+  it("still requires --cli-type when the provider id is an alias", async () => {
+    const errors: string[] = [];
+    const result = await runCli(
+      ["config", "add-provider", "--id", "antigravity", "--model-id", "gemini-3.6-flash-high"],
+      { log: () => {}, error: (msg: string) => errors.push(msg) }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(errors.some((x) => x.includes("is not a CLI tool name, so --cli-type is required"))).toBe(true);
+  });
+
+  it("keeps an explicit --cli-type that differs from the provider id", async () => {
+    const root = await mkdtemp(join(tmpdir(), "argue-cli-alias-"));
+    const configPath = join(root, "argue.config.json");
+    await writeJson(configPath, VALID_CONFIG);
+
+    const result = await runCli(
+      [
+        "config",
+        "add-provider",
+        "--config",
+        configPath,
+        "--id",
+        "antigravity",
+        "--cli-type",
+        "copilot",
+        "--command",
+        "agy-argue",
+        "--model-id",
+        "gemini-3.6-flash-high"
+      ],
+      { log: () => {}, error: () => {} }
+    );
+
+    expect(result.ok).toBe(true);
+    const loaded = await loadCliConfig({ explicitPath: configPath });
+    const provider = loaded.config.providers.antigravity;
+    if (provider?.type === "cli") {
+      expect(provider.cliType).toBe("copilot");
+      expect(provider.command).toBe("agy-argue");
+    }
+  });
+
   it("cli provider defaults command to cliType when omitted", async () => {
     const root = await mkdtemp(join(tmpdir(), "argue-cli-default-cmd-"));
     const configPath = join(root, "argue.config.json");

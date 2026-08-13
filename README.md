@@ -31,9 +31,14 @@ The link points at `packages/argue-cli/dist/cli.js`, and npm workspaces resolve 
 # Create config file (~/.config/argue/config.json)
 argue config init
 
-# Add providers and agents
-argue config add-provider --id claude --type cli --cli-type claude --model-id sonnet --agent claude-agent
-argue config add-provider --id codex --type cli --cli-type codex --model-id gpt-5.3-codex --agent codex-agent
+# Add providers and agents. The provider id names the CLI tool, so --type cli
+# and --cli-type are inferred from it.
+argue config add-provider --id claude --model-id claude-opus-5 --agent claude-agent
+argue config add-provider --id codex --model-id gpt-5.6-sol --agent codex-agent
+
+# An alias pointing at another tool's protocol still spells itself out
+argue config add-provider --id antigravity --cli-type copilot --command agy-argue \
+  --model-id gemini-3.6-flash-high --agent antigravity-agent
 ```
 
 ## Run a Debate
